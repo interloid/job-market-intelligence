@@ -3,23 +3,23 @@ from typing import TYPE_CHECKING
 from sqlalchemy import String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base_model import BaseModel
+from app.models.base_model import Base
 
 if TYPE_CHECKING:
-    from app.models.job_skills_model import JobSkills
+    from app.models.job_skills_model import JobSkill
 
 
-class Skills(BaseModel):
+class Skill(Base):
     __tablename__ = "skills"
 
     __table_args__ = (UniqueConstraint("name", name="uq_skills_name"),)
 
     name: Mapped[str] = mapped_column(
-        String,
+        String(100),
         nullable=False,
     )
 
-    job_skills: Mapped[list["JobSkills"]] = relationship(
-        "JobSkills",
-        back_populates="skills",
+    job_skills: Mapped[list["JobSkill"]] = relationship(
+        "JobSkill",
+        back_populates="skill",
     )

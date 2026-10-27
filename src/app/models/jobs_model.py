@@ -6,7 +6,6 @@ from uuid import UUID
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
-    Enum,
     ForeignKey,
     Numeric,
     String,
@@ -16,23 +15,38 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.constants import JobStatusEnum
-from app.models.base_model import BaseModel
+from app.core.constants import (
+    EmploymentTypeEnum,
+    JobStatusEnum,
+    PayPeriodEnum,
+    RemoteScopeEnum,
+    SeniorityEnum,
+    pg_enum,
+)
+from app.models.base_model import Base
 
 if TYPE_CHECKING:
-    from app.models.job_audit_logs_model import JobAuditLogs
-    from app.models.job_skills_model import JobSkills
-    from app.models.job_tags_model import JobTags
-    from app.models.source_model import Sources
+    from app.models.job_audit_logs_model import JobAuditLog
+    from app.models.job_skills_model import JobSkill
+    from app.models.job_tags_model import JobTag
+    from app.models.source_model import Source
 
 
-class Jobs(BaseModel):
+class Job(Base):
     __tablename__ = "jobs"
 
     __table_args__ = (
         CheckConstraint(
             "salary_min IS NULL OR salary_max IS NULL OR salary_min <= salary_max",
-            name="ck_jobs_salary_range",
+            name="salary_range",
+        ),
+        CheckConstraint(
+            "salary_min IS NULL OR salary_min >= 0",
+            name="salary_min_nonnegative",
+        ),
+        CheckConstraint(
+            "salary_max IS NULL OR salary_max >= 0",
+            name="salary_max_nonnegative",
         ),
         UniqueConstraint(
             "source_id",
@@ -49,17 +63,17 @@ class Jobs(BaseModel):
     )
 
     external_job_id: Mapped[str] = mapped_column(
-        String,
+        String(255),
         nullable=False,
     )
 
     title: Mapped[str] = mapped_column(
-        String,
+        String(500),
         nullable=False,
     )
 
     company_name: Mapped[str] = mapped_column(
-        String,
+        String(255),
         nullable=False,
     )
 
@@ -69,17 +83,17 @@ class Jobs(BaseModel):
     )
 
     location: Mapped[str] = mapped_column(
-        String,
+        String(255),
         nullable=False,
     )
 
-    remote_scope: Mapped[str | None] = mapped_column(
-        String,
+    remote_scope: Mapped[RemoteScopeEnum | None] = mapped_column(
+        pg_enum(RemoteScopeEnum, name="remote_scope_enum"),
         nullable=True,
     )
 
-    employee_type: Mapped[str | None] = mapped_column(
-        String,
+    employment_type: Mapped[EmploymentTypeEnum | None] = mapped_column(
+        pg_enum(EmploymentTypeEnum, name="employment_type_enum"),
         nullable=True,
     )
 
@@ -94,16 +108,12 @@ class Jobs(BaseModel):
     )
 
     currency: Mapped[str | None] = mapped_column(
-        String,
+        String(3),
         nullable=True,
     )
 
     status: Mapped[JobStatusEnum] = mapped_column(
-        Enum(
-            JobStatusEnum,
-            name="job_enum",
-            values_callable=lambda job_enum: [job.value for job in job_enum],
-        ),
+        pg_enum(JobStatusEnum, name="job_enum"),
         nullable=False,
         default=JobStatusEnum.ACTIVE,
         server_default=JobStatusEnum.ACTIVE.value,
@@ -111,13 +121,13 @@ class Jobs(BaseModel):
     )
 
     content_hash: Mapped[str] = mapped_column(
-        Text,
+        String(64),
         nullable=False,
         index=True,
     )
 
     country_code: Mapped[str | None] = mapped_column(
-        Text,
+        String(2),
         nullable=True,
     )
 
@@ -126,13 +136,13 @@ class Jobs(BaseModel):
         nullable=True,
     )
 
-    seniority: Mapped[str | None] = mapped_column(
-        Text,
+    seniority: Mapped[SeniorityEnum | None] = mapped_column(
+        pg_enum(SeniorityEnum, name="seniority_enum"),
         nullable=True,
     )
 
-    pay_period: Mapped[str | None] = mapped_column(
-        Text,
+    pay_period: Mapped[PayPeriodEnum | None] = mapped_column(
+        pg_enum(PayPeriodEnum, name="pay_period_enum"),
         nullable=True,
     )
 
@@ -146,29 +156,29 @@ class Jobs(BaseModel):
         nullable=True,
     )
 
-    closed_at: Mapped[datetime | None] = mapped_column(
+    expired_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
 
-    job_audit_logs: Mapped[list["JobAuditLogs"]] = relationship(
-        "JobAuditLogs",
+    job_audit_logs: Mapped[list["JobAuditLog"]] = relationship(
+        "JobAuditLog",
+        back_populates="job",
+    )
+
+    source: Mapped["Source"] = relationship(
+        "Source",
         back_populates="jobs",
     )
 
-    sources: Mapped["Sources"] = relationship(
-        "Sources",
-        back_populates="jobs",
-    )
-
-    job_skills: Mapped[list["JobSkills"]] = relationship(
-        "JobSkills",
-        back_populates="jobs",
+    job_skills: Mapped[list["JobSkill"]] = relationship(
+        "JobSkill",
+        back_populates="job",
         cascade="all, delete-orphan",
     )
 
-    job_tags: Mapped[list["JobTags"]] = relationship(
-        "JobTags",
-        back_populates="jobs",
+    job_tags: Mapped[list["JobTag"]] = relationship(
+        "JobTag",
+        back_populates="job",
         cascade="all, delete-orphan",
     )

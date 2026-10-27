@@ -1,19 +1,19 @@
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import Enum, ForeignKey, UniqueConstraint
+from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.constants import JobSkillTAGEnum
-from app.models.base_model import BaseModel
-from app.models.tags_model import Tags
+from app.core.constants import JobSkillTagEnum, pg_enum
+from app.models.base_model import Base
 
 if TYPE_CHECKING:
-    from app.models.jobs_model import Jobs
+    from app.models.jobs_model import Job
+    from app.models.tags_model import Tag
 
 
-class JobTags(BaseModel):
+class JobTag(Base):
     __tablename__ = "job_tags"
 
     __table_args__ = (
@@ -24,15 +24,11 @@ class JobTags(BaseModel):
         ),
     )
 
-    status: Mapped[JobSkillTAGEnum] = mapped_column(
-        Enum(
-            JobSkillTAGEnum,
-            name="job_tag_origin",
-            values_callable=lambda job_tag_enum: [tag.value for tag in job_tag_enum],
-        ),
+    status: Mapped[JobSkillTagEnum] = mapped_column(
+        pg_enum(JobSkillTagEnum, name="job_tag_origin"),
         nullable=False,
-        default=JobSkillTAGEnum.SOURCE,
-        server_default=JobSkillTAGEnum.SOURCE.value,
+        default=JobSkillTagEnum.SOURCE,
+        server_default=JobSkillTagEnum.SOURCE.value,
         index=True,
     )
 
@@ -50,12 +46,12 @@ class JobTags(BaseModel):
         index=True,
     )
 
-    tags: Mapped["Tags"] = relationship(
-        "Tags",
+    tag: Mapped["Tag"] = relationship(
+        "Tag",
         back_populates="job_tags",
     )
 
-    jobs: Mapped["Jobs"] = relationship(
-        "Jobs",
+    job: Mapped["Job"] = relationship(
+        "Job",
         back_populates="job_tags",
     )

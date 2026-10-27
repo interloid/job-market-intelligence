@@ -2,20 +2,20 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, ForeignKey
+from sqlalchemy import DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.constants import JOBAUDITLOGSENUM
-from app.models.base_model import BaseModel
-from app.models.ingestion_runs_model import IngestionRuns
+from app.core.constants import JobAuditLogEnum, pg_enum
+from app.models.base_model import Base
 
 if TYPE_CHECKING:
-    from app.models.jobs_model import Jobs
+    from app.models.ingestion_runs_model import IngestionRun
+    from app.models.jobs_model import Job
 
 
-class JobAuditLogs(BaseModel):
+class JobAuditLog(Base):
     __tablename__ = "job_audit_logs"
 
     ingestion_run_id: Mapped[UUID] = mapped_column(
@@ -32,14 +32,8 @@ class JobAuditLogs(BaseModel):
         index=True,
     )
 
-    change_type: Mapped[JOBAUDITLOGSENUM] = mapped_column(
-        Enum(
-            JOBAUDITLOGSENUM,
-            name="job_audit_log",
-            values_callable=lambda job_audit_log: [
-                job_log.value for job_log in job_audit_log
-            ],
-        ),
+    change_type: Mapped[JobAuditLogEnum] = mapped_column(
+        pg_enum(JobAuditLogEnum, name="job_audit_log"),
         nullable=False,
     )
 
@@ -53,12 +47,12 @@ class JobAuditLogs(BaseModel):
         nullable=True,
     )
 
-    ingestion_run: Mapped["IngestionRuns"] = relationship(
-        "IngestionRuns",
+    ingestion_run: Mapped["IngestionRun"] = relationship(
+        "IngestionRun",
         back_populates="job_audit_logs",
     )
 
-    jobs: Mapped["Jobs"] = relationship(
-        "Jobs",
+    job: Mapped["Job"] = relationship(
+        "Job",
         back_populates="job_audit_logs",
     )

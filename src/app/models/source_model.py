@@ -5,7 +5,6 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
-    Enum,
     Integer,
     String,
     Text,
@@ -13,30 +12,28 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.constants import SourceStatusEnum
-from app.models.base_model import BaseModel
-from app.models.ingestion_runs_model import IngestionRuns
+from app.core.constants import SourceStatusEnum, pg_enum
+from app.models.base_model import Base
 
 if TYPE_CHECKING:
-    from app.models.jobs_model import Jobs
+    from app.models.ingestion_runs_model import IngestionRun
+    from app.models.jobs_model import Job
 
 
-class Sources(BaseModel):
+class Source(Base):
     __tablename__ = "sources"
 
     __table_args__ = (
-        CheckConstraint(
-            "fetch_interval_minutes > 0", name="ck_sources_fetch_interval_positive"
-        ),
+        CheckConstraint("fetch_interval_minutes > 0", name="fetch_interval_positive"),
     )
 
     name: Mapped[str] = mapped_column(
-        String,
+        String(200),
         nullable=False,
     )
 
     source_type: Mapped[str] = mapped_column(
-        String,
+        String(50),
         nullable=False,
     )
 
@@ -61,13 +58,7 @@ class Sources(BaseModel):
     )
 
     status: Mapped[SourceStatusEnum] = mapped_column(
-        Enum(
-            SourceStatusEnum,
-            name="source_enum",
-            values_callable=lambda source_enum: [
-                source.value for source in source_enum
-            ],
-        ),
+        pg_enum(SourceStatusEnum, name="source_enum"),
         nullable=False,
         default=SourceStatusEnum.ACTIVE,
         server_default=SourceStatusEnum.ACTIVE.value,
@@ -120,18 +111,19 @@ class Sources(BaseModel):
     )
 
     approved_by: Mapped[str | None] = mapped_column(
-        String,
+        String(255),
         nullable=True,
     )
 
     adapter_version: Mapped[str | None] = mapped_column(
-        String,
+        String(100),
         nullable=True,
     )
 
-    code: Mapped[str | None] = mapped_column(
-        String,
-        nullable=True,
+    code: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        unique=True,
     )
 
     terms_reviewed_at: Mapped[datetime | None] = mapped_column(
@@ -149,12 +141,12 @@ class Sources(BaseModel):
         nullable=True,
     )
 
-    ingestion_runs: Mapped[list["IngestionRuns"]] = relationship(
-        "IngestionRuns",
-        back_populates="sources",
+    ingestion_runs: Mapped[list["IngestionRun"]] = relationship(
+        "IngestionRun",
+        back_populates="source",
     )
 
-    jobs: Mapped[list["Jobs"]] = relationship(
-        "Jobs",
-        back_populates="sources",
+    jobs: Mapped[list["Job"]] = relationship(
+        "Job",
+        back_populates="source",
     )
