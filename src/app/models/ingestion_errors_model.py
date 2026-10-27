@@ -20,9 +20,10 @@ class IngestionErrors(BaseModel):
         PG_UUID(as_uuid=True),
         ForeignKey("ingestion_runs.id"),
         nullable=False,
+        index=True,
     )
 
-    error_type: Mapped[str] = mapped_column(
+    error_type: Mapped[str | None] = mapped_column(
         String,
         nullable=True,
     )
@@ -40,12 +41,12 @@ class IngestionErrors(BaseModel):
                 ingestion_error.value for ingestion_error in ingestion_error_enum
             ],
         ),
-        nullable=True,
+        nullable=False,
     )
 
-    external_job_id: Mapped[str] = mapped_column(
+    external_job_id: Mapped[str | None] = mapped_column(
         Text,
-        nullable=False,
+        nullable=True,
     )
 
     occurred_at: Mapped[datetime | None] = mapped_column(

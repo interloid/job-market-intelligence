@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 from app.core.config import settings
 from app.models.base_model import BaseModel
+import app.models  # noqa: F401
 
 # Import every model so SQLAlchemy registers its tables.
 

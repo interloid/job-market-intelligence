@@ -40,7 +40,7 @@ class Sources(BaseModel):
         nullable=False,
     )
 
-    attribution_text: Mapped[str] = mapped_column(
+    attribution_text: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
@@ -50,7 +50,7 @@ class Sources(BaseModel):
         nullable=False,
     )
 
-    terms_url: Mapped[str] = mapped_column(
+    terms_url: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
@@ -109,27 +109,27 @@ class Sources(BaseModel):
         nullable=False,
     )
 
-    request_budget_per_day: Mapped[int] = mapped_column(
+    request_budget_per_day: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
     )
 
-    retention_days: Mapped[int] = mapped_column(
+    retention_days: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
     )
 
-    approved_by: Mapped[str] = mapped_column(
+    approved_by: Mapped[str | None] = mapped_column(
         String,
         nullable=True,
     )
 
-    adapter_version: Mapped[str] = mapped_column(
+    adapter_version: Mapped[str | None] = mapped_column(
         String,
         nullable=True,
     )
 
-    code: Mapped[str] = mapped_column(
+    code: Mapped[str | None] = mapped_column(
         String,
         nullable=True,
     )

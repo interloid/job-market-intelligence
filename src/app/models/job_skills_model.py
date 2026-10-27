@@ -4,7 +4,6 @@ from uuid import UUID
 from sqlalchemy import Enum, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from uuid6 import uuid7
 
 from app.core.constants import JobSkillTAGEnum
 from app.models.base_model import BaseModel
@@ -21,8 +20,7 @@ class JobSkills(BaseModel):
         UniqueConstraint(
             "job_id",
             "skill_id",
-            "status",
-            name="uq_job_skills_job_skill_status",
+            name="uq_job_skills_job_skill",
         ),
     )
 
@@ -42,16 +40,16 @@ class JobSkills(BaseModel):
 
     skill_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("skills.id"),
-        default=uuid7,
+        ForeignKey("skills.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
 
     job_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("jobs.id"),
-        default=uuid7,
+        ForeignKey("jobs.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
 
     skills: Mapped["Skills"] = relationship(

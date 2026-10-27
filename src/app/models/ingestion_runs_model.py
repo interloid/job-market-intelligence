@@ -10,8 +10,10 @@ from app.core.constants import IngestionRunStatusEnum
 from app.models.base_model import BaseModel
 from app.models.ingestion_errors_model import IngestionErrors
 
+
 if TYPE_CHECKING:
     from app.models.source_model import Sources
+    from app.models.job_audit_logs_model import JobAuditLogs
 
 
 class IngestionRuns(BaseModel):
@@ -19,11 +21,12 @@ class IngestionRuns(BaseModel):
 
     source_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("sources.id"),
+        ForeignKey("sources.id", ondelete="RESTRICT"),
         nullable=False,
+        index=True,
     )
 
-    prefect_flow_id: Mapped[str] = mapped_column(
+    prefect_flow_id: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
@@ -36,10 +39,10 @@ class IngestionRuns(BaseModel):
                 ingestion.value for ingestion in ingestion_enum
             ],
         ),
-        nullable=True,
+        nullable=False,
     )
 
-    path: Mapped[str] = mapped_column(
+    path: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
@@ -79,7 +82,7 @@ class IngestionRuns(BaseModel):
         nullable=False,
     )
 
-    http_status: Mapped[int] = mapped_column(
+    http_status: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
     )
@@ -110,7 +113,7 @@ class IngestionRuns(BaseModel):
         back_populates="ingestion_run",
     )
 
-    job_audit_logs: Mapped["IngestionErrors"] = relationship(
-        "IngestionErrors",
+    job_audit_logs: Mapped[list["JobAuditLogs"]] = relationship(
+        "JobAuditLogs",
         back_populates="ingestion_run",
     )

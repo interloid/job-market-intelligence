@@ -1,4 +1,3 @@
-from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
@@ -12,7 +11,7 @@ engine = create_async_engine(
     pool_recycle=settings.DB_POOL_RECYCLE,
 )
 
-sessionLocal = async_sessionmaker(
+SessionLocal = async_sessionmaker(
     bind=engine,
     autoflush=False,
     autocommit=False,
@@ -22,13 +21,9 @@ sessionLocal = async_sessionmaker(
 
 
 async def get_db():
-    async with sessionLocal() as db:
+    async with SessionLocal() as db:
         try:
             yield db
-            await db.commit()
-        except SQLAlchemyTimeoutError:
-            await db.rollback()
-            raise
         except Exception:
             await db.rollback()
             raise

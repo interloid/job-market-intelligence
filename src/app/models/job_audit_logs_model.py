@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy import DateTime, Enum, ForeignKey
@@ -20,14 +20,16 @@ class JobAuditLogs(BaseModel):
 
     ingestion_run_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("ingestion_runs.id"),
+        ForeignKey("ingestion_runs.id", ondelete="RESTRICT"),
         nullable=False,
+        index=True,
     )
 
     job_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("jobs.id"),
+        ForeignKey("jobs.id", ondelete="RESTRICT"),
         nullable=False,
+        index=True,
     )
 
     change_type: Mapped[JOBAUDITLOGSENUM] = mapped_column(
@@ -38,10 +40,10 @@ class JobAuditLogs(BaseModel):
                 job_log.value for job_log in job_audit_log
             ],
         ),
-        nullable=True,
+        nullable=False,
     )
 
-    changed_fields: Mapped[str] = mapped_column(
+    changed_fields: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
     )

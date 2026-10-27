@@ -43,13 +43,14 @@ class Jobs(BaseModel):
 
     source_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("sources.id"),
+        ForeignKey("sources.id", ondelete="RESTRICT"),
         nullable=False,
+        index=True,
     )
 
     external_job_id: Mapped[str] = mapped_column(
         String,
-        nullable=True,
+        nullable=False,
     )
 
     title: Mapped[str] = mapped_column(
@@ -62,7 +63,7 @@ class Jobs(BaseModel):
         nullable=False,
     )
 
-    description: Mapped[str] = mapped_column(
+    description: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
@@ -72,27 +73,27 @@ class Jobs(BaseModel):
         nullable=False,
     )
 
-    remote_scope: Mapped[str] = mapped_column(
+    remote_scope: Mapped[str | None] = mapped_column(
         String,
         nullable=True,
     )
 
-    employee_type: Mapped[str] = mapped_column(
+    employee_type: Mapped[str | None] = mapped_column(
         String,
         nullable=True,
     )
 
-    salary_min: Mapped[Decimal] = mapped_column(
+    salary_min: Mapped[Decimal | None] = mapped_column(
         Numeric,
         nullable=True,
     )
 
-    salary_max: Mapped[Decimal] = mapped_column(
+    salary_max: Mapped[Decimal | None] = mapped_column(
         Numeric,
         nullable=True,
     )
 
-    currency: Mapped[str] = mapped_column(
+    currency: Mapped[str | None] = mapped_column(
         String,
         nullable=True,
     )
@@ -115,22 +116,22 @@ class Jobs(BaseModel):
         index=True,
     )
 
-    country_code: Mapped[str] = mapped_column(
+    country_code: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
 
-    apply_url: Mapped[str] = mapped_column(
+    apply_url: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
 
-    seniority: Mapped[str] = mapped_column(
+    seniority: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
 
-    pay_period: Mapped[str] = mapped_column(
+    pay_period: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
@@ -163,9 +164,11 @@ class Jobs(BaseModel):
     job_skills: Mapped[list["JobSkills"]] = relationship(
         "JobSkills",
         back_populates="jobs",
+        cascade="all, delete-orphan",
     )
 
     job_tags: Mapped[list["JobTags"]] = relationship(
         "JobTags",
         back_populates="jobs",
+        cascade="all, delete-orphan",
     )
