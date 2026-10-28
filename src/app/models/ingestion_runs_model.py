@@ -24,6 +24,9 @@ class IngestionRun(Base):
         CheckConstraint("records_skipped >= 0", name="records_skipped_nonnegative"),
         CheckConstraint("records_failed >= 0", name="records_failed_nonnegative"),
         CheckConstraint("retry_count >= 0", name="retry_count_nonnegative"),
+        CheckConstraint(
+            "finished_at >= started_at", name="ck_ingestion_runs_finished_after_started"
+        ),
     )
 
     source_id: Mapped[UUID] = mapped_column(

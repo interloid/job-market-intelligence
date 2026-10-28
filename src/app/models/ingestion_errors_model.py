@@ -18,7 +18,7 @@ class IngestionError(Base):
 
     ingestion_run_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("ingestion_runs.id"),
+        ForeignKey("ingestion_runs.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
     )

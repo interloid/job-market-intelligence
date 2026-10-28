@@ -195,6 +195,10 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "retry_count >= 0", name="ck_ingestion_runs_retry_count_nonnegative"
         ),
+        sa.CheckConstraint(
+            "finished_at >= started_at",
+            name="ck_ingestion_runs_finished_after_started",
+        ),
         sa.ForeignKeyConstraint(
             ["source_id"],
             ["sources.id"],
@@ -311,7 +315,6 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_jobs_content_hash"), "jobs", ["content_hash"], unique=False
     )
-    op.create_index(op.f("ix_jobs_source_id"), "jobs", ["source_id"], unique=False)
     op.create_index(op.f("ix_jobs_status"), "jobs", ["status"], unique=False)
     op.create_table(
         "ingestion_errors",
@@ -344,6 +347,7 @@ def upgrade() -> None:
             ["ingestion_run_id"],
             ["ingestion_runs.id"],
             name="fk_ingestion_errors_ingestion_run_id_ingestion_runs",
+            ondelete="RESTRICT",
         ),
         sa.PrimaryKeyConstraint("id", name="pk_ingestion_errors"),
     )
@@ -508,7 +512,6 @@ def downgrade() -> None:
     )
     op.drop_table("ingestion_errors")
     op.drop_index(op.f("ix_jobs_status"), table_name="jobs")
-    op.drop_index(op.f("ix_jobs_source_id"), table_name="jobs")
     op.drop_index(op.f("ix_jobs_content_hash"), table_name="jobs")
     op.drop_table("jobs")
     op.drop_index(op.f("ix_ingestion_runs_source_id"), table_name="ingestion_runs")
