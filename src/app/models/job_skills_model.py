@@ -20,7 +20,7 @@ class JobSkill(Base):
         UniqueConstraint(
             "job_id",
             "skill_id",
-            name="uq_job_skills_job_skill",
+            name="job_skill",
         ),
     )
 

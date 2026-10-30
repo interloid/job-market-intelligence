@@ -1,21 +1,19 @@
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 
-from app.db.database import dispose_engine, get_engine
+from app.core.config import get_settings
+from app.core.lifespan import lifespan
 
+settings = get_settings()
 
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    get_engine()
-    try:
-        yield
-    finally:
-        await dispose_engine()
-
-
-app = FastAPI(lifespan=lifespan)
-
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    description=settings.PROJECT_DESCRIPTION,
+    version=settings.VERSION,
+    docs_url=settings.DOCS_URL if settings.DEBUG else None,
+    redoc_url=settings.REDOC_URL if settings.DEBUG else None,
+    openapi_url="/openapi.json" if settings.DEBUG else None,
+    lifespan=lifespan,
+)
 
 @app.get("/")
 async def home():

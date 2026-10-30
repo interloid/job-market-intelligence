@@ -22,4 +22,6 @@ class Tag(Base):
     job_tags: Mapped[list["JobTag"]] = relationship(
         "JobTag",
         back_populates="tag",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
