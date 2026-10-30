@@ -13,6 +13,17 @@ class Settings(BaseSettings):
     DB_ECHO: bool = False
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
 
+    PROJECT_NAME: str = "job-market-intelligence-api"
+    PROJECT_DESCRIPTION: str
+    VERSION: str = "1.0.0"
+    DOCS_URL: str = "/docs"
+    REDOC_URL: str = "/redoc"
+    DEBUG: bool = True
+
+    API_PREFIX: str = "/api"
+    API_VERSION: str = "v1"
+    API_V1_PREFIX: str = f"{API_PREFIX}/{API_VERSION}"
+
     DB_POOL_SIZE: int = Field(default=5, ge=1)
     DB_MAX_OVERFLOW: int = Field(default=10, ge=0)
     DB_POOL_TIMEOUT: int = Field(default=30, ge=0)

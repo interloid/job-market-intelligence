@@ -9,7 +9,7 @@ from app.models.base_model import Base
 ModelType = TypeVar("ModelType", bound=Base)
 
 
-class BaseRepository:
+class BaseRepository[ModelType: Base]:
     def __init__(self, model: type[ModelType], db: AsyncSession):
         self.db = db
         self.model = model
@@ -20,8 +20,12 @@ class BaseRepository:
         await self.db.refresh(obj)
         return obj
 
-    async def list_all(self) -> list[ModelType]:
-        stmt = select(self.model)
+    async def list_all(
+        self,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> list[ModelType]:
+        stmt = select(self.model).limit(limit).offset(offset)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
@@ -32,9 +36,8 @@ class BaseRepository:
 
     async def update(self, obj: ModelType) -> ModelType:
         await self.db.flush()
-        await self.db.refresh(obj)
         return obj
 
     async def delete(self, obj: ModelType) -> None:
         await self.db.delete(obj)
-        await self.db.refresh()
+        await self.db.flush()

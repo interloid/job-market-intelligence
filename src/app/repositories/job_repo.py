@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import JobStatusEnum
@@ -27,8 +27,12 @@ class JobRepository(BaseRepository[Job]):
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_by_content_hash(self, content_hash: str) -> Job | None:
-        stmt = select(Job).where(Job.content_hash == content_hash)
+    async def get_by_content_hash(
+        self, source_id: UUID, content_hash: str
+    ) -> Job | None:
+        stmt = select(Job).where(
+            Job.source_id == source_id, Job.content_hash == content_hash
+        )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -46,8 +50,11 @@ class JobRepository(BaseRepository[Job]):
     ) -> list[Job]:
         stmt = select(Job).where(
             Job.source_id == source_id,
-            Job.verified_at < cutoff,
             Job.status == JobStatusEnum.ACTIVE,
+            or_(
+                Job.verified_at < cutoff,
+                Job.verified_at.is_(None),
+            ),
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())

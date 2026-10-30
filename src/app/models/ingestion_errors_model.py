@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,7 +24,7 @@ class IngestionError(Base):
     )
 
     error_type: Mapped[str | None] = mapped_column(
-        String,
+        String(100),
         nullable=True,
     )
 
@@ -44,8 +44,7 @@ class IngestionError(Base):
     )
 
     occurred_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
+        DateTime(timezone=True), nullable=True, server_default=func.now()
     )
 
     ingestion_run: Mapped["IngestionRun"] = relationship(

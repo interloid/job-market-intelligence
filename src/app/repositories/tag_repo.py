@@ -19,7 +19,7 @@ class TagRepository(BaseRepository[Tag]):
 
         stmt = (
             insert(Tag)
-            .values(name=name)
+            .values(name=name.strip().lower())
             .on_conflict_do_nothing(index_elements=[Tag.name])
             .returning(Tag.id)
         )

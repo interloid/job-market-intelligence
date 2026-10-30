@@ -23,13 +23,13 @@ class SourceRepository(BaseRepository[Source]):
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
-    async def update_last_fetched_at(self, source_id: UUID) -> Source:
+    async def update_last_run_at(self, source_id: UUID) -> Source | None:
         source = await self.get_by_id(source_id)
 
         if source is None:
             return None
 
-        source.last_fetched_at = datetime.now(UTC)
+        source.last_run_at = datetime.now(UTC)
         await self.db.flush()
 
         return source

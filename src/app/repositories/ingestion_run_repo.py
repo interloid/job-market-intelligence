@@ -9,7 +9,7 @@ from app.models.ingestion_runs_model import IngestionRun
 from app.repositories.base_repo import BaseRepository
 
 
-class IngesitionRunsRepository(BaseRepository[IngestionRun]):
+class IngestionRunsRepository(BaseRepository[IngestionRun]):
     def __init__(self, db: AsyncSession):
         super().__init__(model=IngestionRun, db=db)
 
@@ -31,15 +31,20 @@ class IngesitionRunsRepository(BaseRepository[IngestionRun]):
 
         return ingestion_run
 
-    async def mark_finished(self, ingestion_id: UUID) -> IngestionRun | None:
+    async def finish(
+        self,
+        ingestion_id: UUID,
+        status: IngestionRunStatusEnum,
+    ) -> IngestionRun | None:
         ingestion_run = await self.get_by_id(ingestion_id)
 
         if ingestion_run is None:
             return None
 
+        ingestion_run.status = status
         ingestion_run.finished_at = datetime.now(UTC)
-        await self.db.flush()
 
+        await self.db.flush()
         return ingestion_run
 
     async def update_counters(

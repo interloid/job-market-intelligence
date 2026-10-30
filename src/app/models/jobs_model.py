@@ -51,7 +51,7 @@ class Job(Base):
         UniqueConstraint(
             "source_id",
             "external_job_id",
-            name="uq_jobs_source_external_id",
+            name="source_external_id",
         ),
     )
 
@@ -59,7 +59,6 @@ class Job(Base):
         PG_UUID(as_uuid=True),
         ForeignKey("sources.id", ondelete="RESTRICT"),
         nullable=False,
-        index=True,
     )
 
     external_job_id: Mapped[str] = mapped_column(
@@ -175,10 +174,12 @@ class Job(Base):
         "JobSkill",
         back_populates="job",
         cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     job_tags: Mapped[list["JobTag"]] = relationship(
         "JobTag",
         back_populates="job",
         cascade="all, delete-orphan",
+        passive_deletes=True,
     )

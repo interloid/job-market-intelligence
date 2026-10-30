@@ -24,9 +24,7 @@ class IngestionRun(Base):
         CheckConstraint("records_skipped >= 0", name="records_skipped_nonnegative"),
         CheckConstraint("records_failed >= 0", name="records_failed_nonnegative"),
         CheckConstraint("retry_count >= 0", name="retry_count_nonnegative"),
-        CheckConstraint(
-            "finished_at >= started_at", name="ck_ingestion_runs_finished_after_started"
-        ),
+        CheckConstraint("finished_at >= started_at", name="finished_after_started"),
     )
 
     source_id: Mapped[UUID] = mapped_column(
@@ -44,6 +42,8 @@ class IngestionRun(Base):
     status: Mapped[IngestionRunStatusEnum] = mapped_column(
         pg_enum(IngestionRunStatusEnum, name="ingestion_enum"),
         nullable=False,
+        default=IngestionRunStatusEnum.RUNNING,
+        server_default=IngestionRunStatusEnum.RUNNING.value,
     )
 
     path: Mapped[str | None] = mapped_column(
@@ -54,35 +54,30 @@ class IngestionRun(Base):
     records_fetched: Mapped[int] = mapped_column(
         Integer,
         server_default=text("0"),
-        default=0,
         nullable=False,
     )
 
     records_inserted: Mapped[int] = mapped_column(
         Integer,
         server_default=text("0"),
-        default=0,
         nullable=False,
     )
 
     records_updated: Mapped[int] = mapped_column(
         Integer,
         server_default=text("0"),
-        default=0,
         nullable=False,
     )
 
     records_skipped: Mapped[int] = mapped_column(
         Integer,
         server_default=text("0"),
-        default=0,
         nullable=False,
     )
 
     records_failed: Mapped[int] = mapped_column(
         Integer,
         server_default=text("0"),
-        default=0,
         nullable=False,
     )
 
@@ -93,7 +88,6 @@ class IngestionRun(Base):
 
     retry_count: Mapped[int] = mapped_column(
         Integer,
-        default=0,
         server_default=text("0"),
         nullable=False,
     )

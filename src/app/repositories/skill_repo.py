@@ -19,7 +19,7 @@ class SkillRepository(BaseRepository[Skill]):
 
         stmt = (
             insert(Skill)
-            .values(name=name)
+            .values(name=name.strip().lower())
             .on_conflict_do_nothing(index_elements=[Skill.name])
             .returning(Skill.id)
         )
