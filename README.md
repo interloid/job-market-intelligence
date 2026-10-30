@@ -1,1 +1,1 @@
-# Automated-Data-Intelligence-platform---Job-portal
+# Job-Market-Intelligence-api
