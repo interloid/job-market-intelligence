@@ -1,41 +1,60 @@
+import asyncio
+import logging
 from decimal import Decimal
 
+import httpx
 from pydantic import ValidationError
 
 from app.adapters.job_schema import AdapterJobSchema, JobSchema
 from app.adapters.remoteok.schema import RemoteOKJobSchema
+from app.utils.content_hash import generate_content_hash
+
+logger = logging.getLogger(__name__)
 
 
 class RemoteOkAdapter:
     @staticmethod
-    def filter_job_record(records: list[dict]) -> list[dict]:
+    def filter_job_record(records: list[dict]) -> tuple[list[dict], list[dict]]:
         job_records = []
+        skipped_records = []
 
         for record in records:
-            if "id" in record and "title" in record and "company in record":
+            if "id" in record or "position" in record:
                 job_records.append(record)
+            else:
+                skipped_records.append(record)
 
-        return job_records
+                logger.warning(
+                    "skipping non-job records from remote ok available keys=%s",
+                    list(record.keys()),
+                )
+
+        return job_records, skipped_records
 
     @staticmethod
     def validate_job_record(
         records: list[dict],
     ) -> tuple[list[RemoteOKJobSchema], list[dict]]:
 
-        try:
-            valid_records = []
-            invalid_records = []
+        valid_records = []
+        invalid_records = []
 
-            for record in records:
+        for record in records:
+            try:
                 model_validation = RemoteOKJobSchema.model_validate(record)
                 valid_records.append(model_validation)
-        except ValidationError as exc:
-            invalid_records.append(
-                {
-                    "record": record,
-                    "error": str(exc),
-                }
-            )
+            except ValidationError as exc:
+                invalid_records.append(
+                    {
+                        "record": record,
+                        "error": str(exc),
+                    }
+                )
+                logger.warning(
+                    "RemoteOK job validation failed: job_id=%s, errors=%s",
+                    record.get("id"),
+                    exc.errors(include_input=False),
+                )
 
         return valid_records, invalid_records
 
@@ -47,17 +66,137 @@ class RemoteOkAdapter:
             title=record.position,
             company_name=record.company,
             description=record.description,
-            location=record.location,
-            apply_url=record.apply_url,
+            location=record.location.strip() or None if record.location else None,
+            source_url=record.url,
+            apply_url=record.apply_url or record.url,
             posted_at=record.date,
             salary_min=(
-                Decimal(str(record.salary_min)) if record.salary_min else None,
+                Decimal(str(record.salary_min))
+                if record.salary_min is not None and record.salary_min > 0
+                else None
             ),
             salary_max=(
-                Decimal(str(record.salary_max)) if record.salary_max else None,
+                Decimal(str(record.salary_max))
+                if record.salary_max is not None and record.salary_max > 0
+                else None
             ),
         )
+
+        job.content_hash = generate_content_hash(job)
+
         return AdapterJobSchema(
             job=job,
-            source_tag=record.tag,
+            source_tags=record.tags,
         )
+
+    @staticmethod
+    def process_job_records(
+        records: list[dict],
+    ) -> tuple[list[AdapterJobSchema], list[dict], list[dict]]:
+
+        filtered_jobs, skipped_records = RemoteOkAdapter.filter_job_record(records)
+
+        valid_records, invalid_records = RemoteOkAdapter.validate_job_record(
+            filtered_jobs
+        )
+
+        normalized_records = [
+            RemoteOkAdapter.normalize_job_record(record) for record in valid_records
+        ]
+
+        logger.info(
+            (
+                "RemoteOK processing completed: "
+                "total_records=%s, valid_jobs=%s, "
+                "invalid_records=%s, skipped_records=%s"
+            ),
+            len(records),
+            len(normalized_records),
+            len(invalid_records),
+            len(skipped_records),
+        )
+
+        return normalized_records, invalid_records, skipped_records
+
+    @staticmethod
+    async def fetch_job_records() -> list[dict]:
+        max_attempts = 3
+        last_exception = None
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(
+                        "https://remoteok.com/api",
+                        timeout=30.0,
+                    )
+
+                    response.raise_for_status()
+
+                    try:
+                        data = response.json()
+
+                    except ValueError:
+                        logger.exception("RemoteOK API returned invalid JSON")
+                        raise
+
+                    if not isinstance(data, list):
+                        raise TypeError(
+                            "Expected a list of job records from RemoteOK API"
+                        )
+
+                    if not data:
+                        raise ValueError("RemoteOK API returned an empty response")
+
+                    if not all(isinstance(record, dict) for record in data):
+                        raise ValueError(
+                            "RemoteOK API response contains a non-dictionary record"
+                        )
+
+                    return data
+
+            except httpx.HTTPStatusError as exc:
+                status_code = exc.response.status_code
+
+                if status_code != 429 and not 500 <= status_code < 600:
+                    logger.exception("RemoteOK API return an unsuccessfull HTTP status")
+                    raise
+                last_exception = exc
+                logger.warning("RemoteOK API returned HTTP status=%s", status_code)
+
+            except httpx.RequestError as exc:
+                last_exception = exc
+                logger.warning(
+                    "RemoteOK API request failed: %s",
+                    exc,
+                    exc_info=True,
+                )
+
+            except ValueError:
+                raise
+
+            if attempt == max_attempts:
+                raise last_exception
+
+            delay = 2**attempt
+
+            logger.warning(
+                "Retrying RemoteOK API request in %s seconds (attempt %s/%s)",
+                delay,
+                attempt + 1,
+                max_attempts,
+            )
+
+            await asyncio.sleep(delay)
+
+        raise RuntimeError("RemoteOK API request failed after all retry attempts")
+
+    @staticmethod
+    async def run() -> tuple[list[AdapterJobSchema], list[dict], list[dict]]:
+        raw_records = await RemoteOkAdapter.fetch_job_records()
+
+        normalized_records, invalid_records, skipped_records = (
+            RemoteOkAdapter.process_job_records(raw_records)
+        )
+
+        return normalized_records, invalid_records, skipped_records

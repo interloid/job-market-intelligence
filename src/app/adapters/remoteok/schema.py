@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RemoteOKJobSchema(BaseModel):
@@ -11,7 +11,7 @@ class RemoteOKJobSchema(BaseModel):
     company: str
     company_logo: str | None = None
     position: str
-    tags: list[str]
+    tags: list[str] = Field(default_factory=list)
     description: str | None = None
     location: str | None = None
     apply_url: str | None = None

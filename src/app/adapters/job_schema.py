@@ -28,6 +28,7 @@ class JobSchema(BaseModel):
     status: JobStatusEnum | None = None
     content_hash: str | None = None
     country_code: str | None = None
+    source_url: str | None = None
     apply_url: str | None = None
     seniority: SeniorityEnum | None = None
     pay_period: PayPeriodEnum | None = None
@@ -40,4 +41,4 @@ class JobSchema(BaseModel):
 
 class AdapterJobSchema(BaseModel):
     job: JobSchema
-    source_tag: list[str]
+    source_tags: list[str]
