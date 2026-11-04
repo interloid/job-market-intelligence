@@ -33,3 +33,12 @@ class SourceRepository(BaseRepository[Source]):
         await self.db.flush()
 
         return source
+
+    async def get_eligible_source(self, code: str) -> Source | None:
+        stmt = select(Source).where(
+            Source.code == code,
+            Source.allow_fetch == True,
+            Source.allow_store == True,
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()

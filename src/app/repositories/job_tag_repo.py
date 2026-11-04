@@ -35,6 +35,7 @@ class JobTagRepository(BaseRepository[JobTag]):
             insert(JobTag)
             .values(job_id=job_id, tag_id=tag_id)
             .on_conflict_do_nothing(index_elements=[JobTag.job_id, JobTag.tag_id])
+            .returning(JobTag)
         )
 
         result = await self.db.execute(stmt)

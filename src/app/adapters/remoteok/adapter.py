@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from app.adapters.job_schema import AdapterJobSchema, JobSchema
 from app.adapters.remoteok.schema import RemoteOKJobSchema
-from app.utils.content_hash import generate_content_hash
+from app.utils import clean_job_description, generate_content_hash
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class RemoteOkAdapter:
             external_job_id=record.id,
             title=record.position,
             company_name=record.company,
-            description=record.description,
+            description=clean_job_description(record.description),
             location=record.location.strip() or None if record.location else None,
             source_url=record.url,
             apply_url=record.apply_url or record.url,
@@ -92,7 +92,7 @@ class RemoteOkAdapter:
     @staticmethod
     def process_job_records(
         records: list[dict],
-    ) -> tuple[list[AdapterJobSchema], list[dict], list[dict]]:
+    ) -> tuple[list[AdapterJobSchema], int, int, list[dict], list[dict]]:
 
         filtered_jobs, skipped_records = RemoteOkAdapter.filter_job_record(records)
 
@@ -116,7 +116,13 @@ class RemoteOkAdapter:
             len(skipped_records),
         )
 
-        return normalized_records, invalid_records, skipped_records
+        return (
+            normalized_records,
+            len(records),
+            len(normalized_records),
+            invalid_records,
+            skipped_records,
+        )
 
     @staticmethod
     async def fetch_job_records() -> list[dict]:
@@ -195,8 +201,18 @@ class RemoteOkAdapter:
     async def run() -> tuple[list[AdapterJobSchema], list[dict], list[dict]]:
         raw_records = await RemoteOkAdapter.fetch_job_records()
 
-        normalized_records, invalid_records, skipped_records = (
-            RemoteOkAdapter.process_job_records(raw_records)
-        )
+        (
+            normalized_records,
+            total_records,
+            valid_records,
+            invalid_records,
+            skipped_records,
+        ) = RemoteOkAdapter.process_job_records(raw_records)
 
-        return normalized_records, invalid_records, skipped_records
+        return (
+            normalized_records,
+            total_records,
+            valid_records,
+            invalid_records,
+            skipped_records,
+        )
