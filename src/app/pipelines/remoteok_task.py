@@ -1,10 +1,12 @@
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from prefect import task
 
 from app.adapters.job_schema import AdapterJobSchema
 from app.adapters.remoteok.adapter import RemoteOkAdapter
+from app.core.config import get_settings
 from app.core.constants import IngestionErrorStageEnum, IngestionRunStatusEnum
 from app.db.database import get_session_factory
 from app.models import IngestionError, IngestionRun
@@ -13,7 +15,9 @@ from app.repositories import (
     IngestionRunsRepository,
     SourceRepository,
 )
-from app.services.job_persistence_service import JobPersistenceService
+from app.services import JobPersistenceService, S3StorageService
+
+settings = get_settings()
 
 
 @task(name="fetch_source_data", retries=2, retry_delay_seconds=5)
@@ -35,7 +39,27 @@ async def fetch_remoteok_source():
             "source_name": source.name,
             "base_url": source.base_url,
             "adapter_version": source.adapter_version,
+            "allow_store": source.allow_store,
         }
+
+
+@task(name="update_source_run_schedule")
+async def update_source_run_schedule(source_id: str) -> None:
+
+    async with get_session_factory()() as db:
+        source_repo = SourceRepository(db)
+
+        try:
+            source = await source_repo.update_run_schedule(source_id=UUID(source_id))
+
+            if source is None:
+                raise ValueError("Source not found")
+
+            await db.commit()
+
+        except Exception:
+            await db.rollback()
+            raise
 
 
 @task(
@@ -70,6 +94,12 @@ async def create_ingestion_run(source_id: str):
 async def fetch_remoteok_jobs():
 
     adapter = RemoteOkAdapter()
+    raw_records = await adapter.fetch_job_records()
+    return raw_records
+
+
+@task(name="process_remoteok_jobs")
+async def process_remoteok_jobs(raw_records: list[dict]) -> dict:
 
     (
         normalized_jobs,
@@ -77,7 +107,7 @@ async def fetch_remoteok_jobs():
         valid_records,
         invalid_records,
         skipped_records,
-    ) = await adapter.run()
+    ) = RemoteOkAdapter.process_job_records(raw_records)
 
     return {
         "normalized_jobs": normalized_jobs,
@@ -86,6 +116,36 @@ async def fetch_remoteok_jobs():
         "invalid_records": invalid_records,
         "skipped_records": skipped_records,
     }
+
+
+@task(
+    name="store_raw_data_to_s3",
+    retries=3,
+    retry_delay_seconds=10,
+)
+async def store_raw_data_to_s3(
+    raw_data: Any,
+    source_code: str,
+    ingestion_run_id: str,
+) -> str:
+
+    settings = get_settings()
+
+    now = datetime.now(UTC)
+
+    object_key = f"{source_code}/{now:%Y/%m/%d}/{ingestion_run_id}.json"
+
+    storage_service = S3StorageService(
+        bucket_name=settings.S3_BUCKET_NAME,
+        bucket_region=settings.AWS_REGION,
+    )
+
+    uploaded_key = await storage_service.upload_json(
+        data=raw_data,
+        object_key=object_key,
+    )
+
+    return uploaded_key
 
 
 @task(
@@ -207,3 +267,20 @@ async def fail_ingestion_run(
         except Exception:
             await db.rollback()
             raise
+
+
+@task(name="fetch_due_sources")
+async def fetch_due_sources() -> list[dict]:
+
+    async with get_session_factory()() as db:
+        source_repo = SourceRepository(db)
+
+        sources = await source_repo.claim_due_sources()
+
+        return [
+            {
+                "source_id": str(source.id),
+                "source_code": source.code,
+            }
+            for source in sources
+        ]

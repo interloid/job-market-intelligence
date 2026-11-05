@@ -198,7 +198,9 @@ class RemoteOkAdapter:
         raise RuntimeError("RemoteOK API request failed after all retry attempts")
 
     @staticmethod
-    async def run() -> tuple[list[AdapterJobSchema], list[dict], list[dict]]:
+    async def run() -> tuple[
+        list[dict], list[AdapterJobSchema], int, int, list[dict], list[dict]
+    ]:
         raw_records = await RemoteOkAdapter.fetch_job_records()
 
         (
@@ -210,6 +212,7 @@ class RemoteOkAdapter:
         ) = RemoteOkAdapter.process_job_records(raw_records)
 
         return (
+            raw_records,
             normalized_records,
             total_records,
             valid_records,
