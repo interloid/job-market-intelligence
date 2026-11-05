@@ -15,6 +15,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
 @app.get("/")
 async def home():
     return {"Fastapi is running"}

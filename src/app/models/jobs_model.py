@@ -83,7 +83,7 @@ class Job(Base):
 
     location: Mapped[str] = mapped_column(
         String(255),
-        nullable=False,
+        nullable=True,
     )
 
     remote_scope: Mapped[RemoteScopeEnum | None] = mapped_column(
@@ -129,6 +129,8 @@ class Job(Base):
         String(2),
         nullable=True,
     )
+
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     apply_url: Mapped[str | None] = mapped_column(
         Text,

@@ -14,10 +14,11 @@ class JobRepository(BaseRepository[Job]):
         super().__init__(model=Job, db=db)
 
     async def get_by_source_and_external_id(
-        self, source_id: UUID, external_job_id: str
+        self, source_id: UUID, external_job_id: list[str]
     ) -> Job | None:
         stmt = select(Job).where(
-            Job.source_id == source_id, Job.external_job_id == external_job_id
+            Job.source_id == source_id,
+            Job.external_job_id == external_job_id,
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()

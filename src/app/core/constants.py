@@ -23,8 +23,8 @@ class IngestionRunStatusEnum(StrEnum):
 
 class IngestionErrorStageEnum(StrEnum):
     FETCH = "fetch"
+    S3_STORAGE = "s3_storage"
     PARSE = "parse"
-    VALIDATE = "validate"
     PERSIST = "persist"
 
 
@@ -51,9 +51,7 @@ class EmploymentTypeEnum(StrEnum):
     FULL_TIME = "full_time"
     PART_TIME = "part_time"
     CONTRACT = "contract"
-    TEMPORARY = "temporary"
     INTERNSHIP = "internship"
-    VOLUNTEER = "volunteer"
     OTHER = "other"
 
 

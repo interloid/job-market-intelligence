@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.job_tags_model import JobTag
@@ -26,5 +27,16 @@ class JobTagRepository(BaseRepository[JobTag]):
             JobTag.job_id == job_id,
             JobTag.tag_id == tag_id,
         )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def create_if_not_exists(self, job_id: UUID, tag_id: UUID) -> JobTag | None:
+        stmt = (
+            insert(JobTag)
+            .values(job_id=job_id, tag_id=tag_id)
+            .on_conflict_do_nothing(index_elements=[JobTag.job_id, JobTag.tag_id])
+            .returning(JobTag)
+        )
+
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()

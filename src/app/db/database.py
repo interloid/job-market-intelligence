@@ -33,6 +33,16 @@ def get_engine() -> AsyncEngine:
     return engine
 
 
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    if SessionLocal is None:
+        get_engine()
+
+    if SessionLocal is None:
+        raise RuntimeError("Database session factory was not initialized")
+
+    return SessionLocal
+
+
 async def get_db():
     if SessionLocal is None:
         get_engine()
