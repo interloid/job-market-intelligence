@@ -37,11 +37,11 @@ class SourceRepository(BaseRepository[Source]):
 
         return source
 
-    async def get_eligible_source(self, code: str) -> Source | None:
+    async def get_eligible_source(self, source_id: UUID) -> Source | None:
         stmt = select(Source).where(
-            Source.code == code,
-            Source.allow_fetch == True,
-            Source.allow_store == True,
+            Source.id == source_id,
+            Source.status == SourceStatusEnum.ACTIVE,
+            Source.allow_fetch.is_(True),
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
@@ -62,4 +62,11 @@ class SourceRepository(BaseRepository[Source]):
 
         result = await self.db.execute(stmt)
 
-        return list(result.scalars().all())
+        sources = list(result.scalars().all())
+
+        for source in sources:
+            source.next_run_at = now + timedelta(minutes=source.fetch_interval_minutes)
+
+        await self.db.flush()
+
+        return sources

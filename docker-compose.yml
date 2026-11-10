@@ -1,0 +1,93 @@
+
+services:
+
+  api:
+    image: atnaveen/job-market-intelligence:1.0.0
+    container_name: job-market-intelligence-api
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      PYTHONPATH: /app
+      PREFECT_API_URL: http://prefect-server:4200/api
+
+    ports:
+      - "127.0.0.1:8080:8000"
+
+
+  prefect-server:
+    image: prefecthq/prefect:3.8-python3.12
+    container_name: jmip-prefect-server
+    restart: unless-stopped
+
+    environment:
+      PREFECT_SERVER_DATABASE_CONNECTION_URL: ${PREFECT_DATABASE_URL:?Set PREFECT_DATABASE_URL in .env}
+
+    command:
+      - prefect
+      - server
+      - start
+      - --host
+      - 0.0.0.0
+      - --no-services
+
+    ports:
+      - "127.0.0.1:4200:4200"
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health', timeout=5)"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+
+  prefect-services:
+    image: prefecthq/prefect:3.8-python3.12
+    container_name: adip-prefect-services
+    restart: unless-stopped
+
+    environment:
+      PREFECT_SERVER_DATABASE_CONNECTION_URL: ${PREFECT_DATABASE_URL:?Set PREFECT_DATABASE_URL in .env}
+
+    command:
+      - prefect
+      - server
+      - services
+      - start
+
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+
+
+  prefect-worker:
+    image: atnaveen/job-market-intelligence:1.0.0
+    container_name: adi-prefect-worker
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      PYTHONPATH: /app
+      PREFECT_API_URL: http://prefect-server:4200/api
+
+    command:
+      - prefect
+      - worker
+      - start
+      - --pool
+      - adi-process-pool
+      - --type
+      - process
+
+    depends_on:
+      prefect-server:
+        condition: service_healthy

@@ -81,7 +81,7 @@ class Job(Base):
         nullable=True,
     )
 
-    location: Mapped[str] = mapped_column(
+    location: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
     )

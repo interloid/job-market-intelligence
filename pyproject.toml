@@ -1,7 +1,7 @@
 [project]
-name = "automated-data-intelligence-platform-job-portal"
+name = "job-market-intelligence-api"
 version = "0.1.0"
-description = "Add your description here"
+description = "An automated data intelligence platform for job aggregation, normalization, and analysis."
 readme = "README.md"
 authors = [
     { name = "naveen-interloid", email = "naveen@interloid.com" }
@@ -30,7 +30,7 @@ dev = [
 
 [tool.uv.build-backend]
 module-name = "app"
-module-root = "src"
+module-root = ""
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]
@@ -39,6 +39,14 @@ build-backend = "uv_build"
 # pyproject.toml
 [tool.mypy]
 plugins = ["pydantic.mypy"]
+[[tool.mypy.overrides]]
+module = [
+    "aioboto3",
+    "aioboto3.*",
+    "botocore",
+    "botocore.*",
+]
+ignore_missing_imports = true
 
 [tool.pydantic-mypy]
 init_forbid_extra = true

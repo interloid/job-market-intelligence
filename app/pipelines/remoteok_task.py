@@ -1,32 +1,35 @@
+import logging
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
 from prefect import task
+from prefect.runtime import task_run
 
-from app.adapters.job_schema import AdapterJobSchema
 from app.adapters.remoteok.adapter import RemoteOkAdapter
 from app.core.config import get_settings
 from app.core.constants import IngestionErrorStageEnum, IngestionRunStatusEnum
 from app.db.database import get_session_factory
-from app.models import IngestionError, IngestionRun
+from app.models import IngestionError, IngestionRun, Source
 from app.repositories import (
     IngestionErrorRepository,
     IngestionRunsRepository,
     SourceRepository,
 )
+from app.schemas.job_schema import AdapterJobSchema
 from app.services import JobPersistenceService, S3StorageService
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
 @task(name="fetch_source_data", retries=2, retry_delay_seconds=5)
-async def fetch_remoteok_source():
+async def fetch_remoteok_source(source_id: UUID):
 
     async with get_session_factory()() as db:
         source_repo = SourceRepository(db)
 
-        source = await source_repo.get_eligible_source("remoteok")
+        source = await source_repo.get_eligible_source(source_id)
 
         if source is None:
             raise ValueError(
@@ -67,7 +70,10 @@ async def update_source_run_schedule(source_id: str) -> None:
     retries=2,
     retry_delay_seconds=5,
 )
-async def create_ingestion_run(source_id: str):
+async def create_ingestion_run(
+    source_id: str,
+    prefect_flow_id: str,
+):
 
     async with get_session_factory()() as db:
         source_uuid = UUID(source_id)
@@ -76,6 +82,7 @@ async def create_ingestion_run(source_id: str):
 
         ingestion_run = IngestionRun(
             source_id=source_uuid,
+            prefect_flow_id=prefect_flow_id,
             status=IngestionRunStatusEnum.RUNNING,
             started_at=datetime.now(UTC),
         )
@@ -91,11 +98,13 @@ async def create_ingestion_run(source_id: str):
     retries=2,
     retry_delay_seconds=5,
 )
-async def fetch_remoteok_jobs():
+async def fetch_remoteok_jobs(source: Source) -> tuple[list[dict], int, int]:
 
     adapter = RemoteOkAdapter()
-    raw_records = await adapter.fetch_job_records()
-    return raw_records
+    raw_records, http_status = await adapter.fetch_job_records(source)
+    retry_count = task_run.run_count - 1
+
+    return raw_records, http_status, retry_count
 
 
 @task(name="process_remoteok_jobs")
@@ -128,8 +137,6 @@ async def store_raw_data_to_s3(
     source_code: str,
     ingestion_run_id: str,
 ) -> str:
-
-    settings = get_settings()
 
     now = datetime.now(UTC)
 
@@ -188,6 +195,9 @@ async def persist_normalized_jobs(
 
         except Exception:
             failed += 1
+            logger.exception(
+                "persist failed external_job_id=%s", adapter_job.job.external_job_id
+            )
 
         return {
             "normalized_jobs": len(normalized_jobs),
@@ -198,7 +208,7 @@ async def persist_normalized_jobs(
         }
 
 
-@task(name="Complete Ingestion Run")
+@task(name="complete_ingestion_run")
 async def complete_ingestion_run(
     ingestion_run_id: str,
     records_fetched: int,
@@ -206,6 +216,9 @@ async def complete_ingestion_run(
     records_updated: int,
     records_skipped: int,
     records_failed: int,
+    s3_path: str | None = None,
+    http_status: int | None = None,
+    retry_count: int = 0,
 ):
     async with get_session_factory()() as db:
         run_repo = IngestionRunsRepository(db)
@@ -221,6 +234,9 @@ async def complete_ingestion_run(
             ingestion_run.records_updated = records_updated
             ingestion_run.records_skipped = records_skipped
             ingestion_run.records_failed = records_failed
+            ingestion_run.path = s3_path
+            ingestion_run.http_status = http_status
+            ingestion_run.retry_count = retry_count
 
             ingestion_run.status = IngestionRunStatusEnum.SUCCESS
             ingestion_run.finished_at = datetime.now(UTC)
@@ -232,7 +248,7 @@ async def complete_ingestion_run(
             raise
 
 
-@task(name="Fail Ingestion Run")
+@task(name="fail_ingestion_run")
 async def fail_ingestion_run(
     ingestion_run_id: str,
     error_message: str,
@@ -275,12 +291,20 @@ async def fetch_due_sources() -> list[dict]:
     async with get_session_factory()() as db:
         source_repo = SourceRepository(db)
 
-        sources = await source_repo.claim_due_sources()
+        try:
+            sources = await source_repo.claim_due_sources()
 
-        return [
-            {
-                "source_id": str(source.id),
-                "source_code": source.code,
-            }
-            for source in sources
-        ]
+            claimed_sources = [
+                {
+                    "source_id": str(source.id),
+                    "source_code": source.code,
+                }
+                for source in sources
+            ]
+
+            await db.commit()
+            return claimed_sources
+
+        except Exception:
+            await db.rollback()
+            raise

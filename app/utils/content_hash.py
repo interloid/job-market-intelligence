@@ -1,7 +1,7 @@
 import hashlib
 import json
 
-from app.adapters.job_schema import JobSchema
+from app.schemas.job_schema import JobSchema
 
 
 def generate_content_hash(job: JobSchema) -> str:
@@ -17,12 +17,16 @@ def generate_content_hash(job: JobSchema) -> str:
         "currency": job.currency,
         "apply_url": job.apply_url,
         "seniority": job.seniority,
+        "posted_at": job.posted_at,
+        "source_url": job.source_url,
+        "country_code": job.country_code,
+        "pay_period": job.pay_period,
     }
 
-    seralized_data = json.dumps(
+    serialized_data = json.dumps(
         content,
         sort_keys=True,
         default=str,
     )
 
-    return hashlib.sha256(seralized_data.encode("utf-8")).hexdigest()
+    return hashlib.sha256(serialized_data.encode("utf-8")).hexdigest()

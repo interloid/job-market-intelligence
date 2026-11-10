@@ -18,11 +18,14 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     DOCS_URL: str = "/docs"
     REDOC_URL: str = "/redoc"
-    DEBUG: bool = True
+    DEBUG: bool = False
 
     API_PREFIX: str = "/api"
     API_VERSION: str = "v1"
-    API_V1_PREFIX: str = f"{API_PREFIX}/{API_VERSION}"
+
+    @property
+    def API_V1_PREFIX(self) -> str:
+        return f"{self.API_PREFIX}/{self.API_VERSION}"
 
     DB_POOL_SIZE: int = Field(default=5, ge=1)
     DB_MAX_OVERFLOW: int = Field(default=10, ge=0)
@@ -30,7 +33,7 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE: int = Field(default=1800, ge=-1)
 
     AWS_ACCESS_KEY_ID: str
-    AWS_SECRET_ACCESS_KEY: str
+    AWS_SECRET_ACCESS_KEY: SecretStr | None = None
     AWS_REGION: str
     S3_BUCKET_NAME: str
 

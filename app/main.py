@@ -14,8 +14,3 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.DEBUG else None,
     lifespan=lifespan,
 )
-
-
-@app.get("/")
-async def home():
-    return {"Fastapi is running"}

@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,11 +17,23 @@ class TagRepository(BaseRepository[Tag]):
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_ids(self, tag_ids: list[UUID]) -> list[Tag]:
+        if not tag_ids:
+            return []
+
+        stmt = select(Tag).where(Tag.id.in_(tag_ids))
+
+        result = await self.db.execute(stmt)
+
+        return list(result.scalars().all())
+
     async def get_or_create(self, name: str) -> Tag:
+
+        name = name.strip().lower()
 
         stmt = (
             insert(Tag)
-            .values(name=name.strip().lower())
+            .values(name=name)
             .on_conflict_do_nothing(index_elements=[Tag.name])
             .returning(Tag.id)
         )

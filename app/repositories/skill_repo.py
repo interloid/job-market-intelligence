@@ -17,9 +17,11 @@ class SkillRepository(BaseRepository[Skill]):
 
     async def get_or_create(self, name: str) -> Skill:
 
+        name = name.strip().lower()
+
         stmt = (
             insert(Skill)
-            .values(name=name.strip().lower())
+            .values(name=name)
             .on_conflict_do_nothing(index_elements=[Skill.name])
             .returning(Skill.id)
         )

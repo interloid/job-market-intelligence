@@ -454,55 +454,6 @@ wheels = [
 ]
 
 [[package]]
-name = "automated-data-intelligence-platform-job-portal"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "aioboto3" },
-    { name = "alembic" },
-    { name = "asyncpg" },
-    { name = "beautifulsoup4" },
-    { name = "fastapi" },
-    { name = "ftfy" },
-    { name = "greenlet" },
-    { name = "httpx" },
-    { name = "prefect" },
-    { name = "pydantic-settings" },
-    { name = "sqlalchemy" },
-    { name = "uuid6" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "mypy" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aioboto3", specifier = ">=15.5.0" },
-    { name = "alembic", specifier = ">=1.20.1" },
-    { name = "asyncpg", specifier = ">=0.32.0" },
-    { name = "beautifulsoup4", specifier = ">=4.15.0" },
-    { name = "fastapi", specifier = "<0.155" },
-    { name = "ftfy", specifier = ">=6.3.1" },
-    { name = "greenlet", specifier = ">=3.5.6" },
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "prefect", specifier = ">=3.8.8" },
-    { name = "pydantic-settings", specifier = ">=2.16.1" },
-    { name = "sqlalchemy", specifier = ">=2.1.6" },
-    { name = "uuid6", specifier = ">=2025.0.1" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.54.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "mypy", specifier = ">=2.4.1" },
-    { name = "ruff", specifier = ">=0.14.0" },
-]
-
-[[package]]
 name = "beartype"
 version = "0.23.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1421,6 +1372,55 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d3/59/322338183ecda247fb5d1763a6cbe46eff7222eaeebafd9fa65d4bf5cb11/jmespath-1.1.0.tar.gz", hash = "sha256:472c87d80f36026ae83c6ddd0f1d05d4e510134ed462851fd5f754c8c3cbb88d", size = 27377, upload-time = "2026-01-22T16:35:26.279Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/14/2f/967ba146e6d58cf6a652da73885f52fc68001525b4197effc174321d70b4/jmespath-1.1.0-py3-none-any.whl", hash = "sha256:a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64", size = 20419, upload-time = "2026-01-22T16:35:24.919Z" },
+]
+
+[[package]]
+name = "job-market-intelligence-api"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "aioboto3" },
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "beautifulsoup4" },
+    { name = "fastapi" },
+    { name = "ftfy" },
+    { name = "greenlet" },
+    { name = "httpx" },
+    { name = "prefect" },
+    { name = "pydantic-settings" },
+    { name = "sqlalchemy" },
+    { name = "uuid6" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "mypy" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aioboto3", specifier = ">=15.5.0" },
+    { name = "alembic", specifier = ">=1.20.1" },
+    { name = "asyncpg", specifier = ">=0.32.0" },
+    { name = "beautifulsoup4", specifier = ">=4.15.0" },
+    { name = "fastapi", specifier = "<0.155" },
+    { name = "ftfy", specifier = ">=6.3.1" },
+    { name = "greenlet", specifier = ">=3.5.6" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "prefect", specifier = ">=3.8.8" },
+    { name = "pydantic-settings", specifier = ">=2.16.1" },
+    { name = "sqlalchemy", specifier = ">=2.1.6" },
+    { name = "uuid6", specifier = ">=2025.0.1" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.54.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mypy", specifier = ">=2.4.1" },
+    { name = "ruff", specifier = ">=0.14.0" },
 ]
 
 [[package]]

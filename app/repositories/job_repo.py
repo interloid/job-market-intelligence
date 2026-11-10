@@ -14,7 +14,7 @@ class JobRepository(BaseRepository[Job]):
         super().__init__(model=Job, db=db)
 
     async def get_by_source_and_external_id(
-        self, source_id: UUID, external_job_id: list[str]
+        self, source_id: UUID, external_job_id: str
     ) -> Job | None:
         stmt = select(Job).where(
             Job.source_id == source_id,
@@ -22,6 +22,19 @@ class JobRepository(BaseRepository[Job]):
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def get_by_external_job_ids(
+        self,
+        source_id: UUID,
+        external_job_ids: list[str],
+    ) -> list[Job]:
+        stmt = select(Job).where(
+            Job.source_id == source_id,
+            Job.external_job_id.in_(external_job_ids),
+        )
+
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
 
     async def get_jobs_by_source_id(self, source_id: UUID) -> list[Job]:
         stmt = select(Job).where(Job.source_id == source_id)

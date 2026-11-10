@@ -22,7 +22,9 @@ async def source_dispatcher_flow():
         if source["source_code"] == "remoteok":
             logger.info("Starting RemoteOK ingestion")
 
-            await remoteok_ingestion_flow()
+            await remoteok_ingestion_flow(
+                source_id=source["source_id"],
+            )
 
         else:
             logger.warning(
