@@ -144,9 +144,7 @@ class RemoteOkAdapter:
 
         try:
             url = source["base_url"]
-            headers = {
-                "User-Agent": "AutomatedDataIntelligence/1.0 (job data aggregator)"
-            }
+            headers = {"User-Agent": "AutomatedDataIntelligence/1.0"}
 
             async with httpx.AsyncClient() as client:
                 response = await client.get(
