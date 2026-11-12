@@ -43,7 +43,30 @@ async def fetch_remoteok_source(source_id: UUID):
             "base_url": source.base_url,
             "adapter_version": source.adapter_version,
             "allow_store": source.allow_store,
+            "last_feed_updated": source.last_feed_updated,
+            "batch_size": source.batch_size,
         }
+
+
+@task(name="update_source_feed_checkpoint")
+async def update_source_feed_checkpoint(source_id: str, last_updated: int) -> None:
+
+    async with get_session_factory()() as db:
+        source_repo = SourceRepository(db)
+
+        try:
+            source = await source_repo.update_feed_checkpoint(
+                source_id=UUID(source_id), last_updated=last_updated
+            )
+
+            if source is None:
+                raise ValueError("Source not found")
+
+            await db.commit()
+
+        except Exception:
+            await db.rollback()
+            raise
 
 
 @task(name="update_source_run_schedule")
@@ -98,17 +121,24 @@ async def create_ingestion_run(
     retries=2,
     retry_delay_seconds=5,
 )
-async def fetch_remoteok_jobs(source: Source) -> tuple[list[dict], int, int]:
+async def fetch_remoteok_jobs(
+    source: Source,
+) -> tuple[list[dict], list[dict], int, int, int]:
 
     adapter = RemoteOkAdapter()
-    raw_records, http_status = await adapter.fetch_job_records(source)
+    (
+        raw_records,
+        job_records,
+        last_updated,
+        http_status,
+    ) = await adapter.fetch_job_records(source)
     retry_count = task_run.run_count - 1
 
-    return raw_records, http_status, retry_count
+    return raw_records, job_records, last_updated, http_status, retry_count
 
 
-@task(name="process_remoteok_jobs")
-async def process_remoteok_jobs(raw_records: list[dict]) -> dict:
+@task(name="process_remoteok_batch")
+async def process_remoteok_batch(job_records: list[dict]) -> dict:
 
     (
         normalized_jobs,
@@ -116,7 +146,7 @@ async def process_remoteok_jobs(raw_records: list[dict]) -> dict:
         valid_records,
         invalid_records,
         skipped_records,
-    ) = RemoteOkAdapter.process_job_records(raw_records)
+    ) = RemoteOkAdapter.process_job_records(job_records)
 
     return {
         "normalized_jobs": normalized_jobs,
@@ -156,11 +186,11 @@ async def store_raw_data_to_s3(
 
 
 @task(
-    name="persist_normalized_jobs",
+    name="persist_normalized_batch",
     retries=2,
     retry_delay_seconds=5,
 )
-async def persist_normalized_jobs(
+async def persist_normalized_batch(
     source_id: str, ingestion_run_id: str, normalized_jobs: list[AdapterJobSchema]
 ) -> dict:
 
@@ -195,9 +225,13 @@ async def persist_normalized_jobs(
 
         except Exception:
             failed += 1
+            await db.rollback()
             logger.exception(
-                "persist failed external_job_id=%s", adapter_job.job.external_job_id
+                "Batch persistence failed. source_id=%s, ingestion_run_id=%s",
+                source_id,
+                ingestion_run_id,
             )
+            raise
 
         return {
             "normalized_jobs": len(normalized_jobs),

@@ -12,11 +12,13 @@ from app.pipelines.remoteok_task import (
     fail_ingestion_run,
     fetch_remoteok_jobs,
     fetch_remoteok_source,
-    persist_normalized_jobs,
-    process_remoteok_jobs,
+    persist_normalized_batch,
+    process_remoteok_batch,
     store_raw_data_to_s3,
     update_source_run_schedule,
+    update_source_feed_checkpoint,
 )
+from app.utils import split_into_batches
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,9 @@ async def remoteok_ingestion_flow(source_id: UUID):
 
     source = await fetch_remoteok_source(source_id=source_id)
 
+    if source["batch_size"] <= 0:
+        raise ValueError("Source batch_size must be greater than zero")
+
     ingestion_run_id = await create_ingestion_run(
         source_id=source["source_id"],
         prefect_flow_id=prefect_flow_id,
@@ -37,41 +42,124 @@ async def remoteok_ingestion_flow(source_id: UUID):
     s3_path = None
 
     try:
-        raw_records, http_status, retry_count = await fetch_remoteok_jobs(source)
+        (
+            raw_records,
+            job_records,
+            last_updated,
+            http_status,
+            retry_count,
+        ) = await fetch_remoteok_jobs(source)
 
-        if source["allow_store"]:
-            current_stage = IngestionErrorStageEnum.S3_STORAGE
+        previous_updated = source["last_feed_updated"]
 
-            s3_path = await store_raw_data_to_s3(
-                raw_data=raw_records,
-                source_code=source["source_code"],
-                ingestion_run_id=ingestion_run_id,
+        if previous_updated is not None and last_updated < previous_updated:
+            raise ValueError(
+                f"RemoteOK feed timestamp regressed. "
+                f"Previous: {previous_updated}, "
+                f"Current: {last_updated}"
             )
 
-        current_stage = IngestionErrorStageEnum.PARSE
-        result = await process_remoteok_jobs(raw_records)
+        has_updated = previous_updated is None or last_updated > previous_updated
 
-        current_stage = IngestionErrorStageEnum.PERSIST
+        if not has_updated:
+            logger.info(
+                "No new feed updates. Skipping processing. "
+                "source_id=%s, last_updated=%s",
+                source["source_id"],
+                last_updated,
+            )
+            await complete_ingestion_run(
+                ingestion_run_id=ingestion_run_id,
+                records_fetched=0,
+                records_updated=0,
+                records_skipped=0,
+                records_inserted=0,
+                records_failed=0,
+                s3_path=None,
+                http_status=http_status,
+                retry_count=retry_count,
+            )
 
-        persistence_result = await persist_normalized_jobs(
-            source_id=source["source_id"],
-            ingestion_run_id=ingestion_run_id,
-            normalized_jobs=result["normalized_jobs"],
-        )
+        else:
+            if source["allow_store"]:
+                current_stage = IngestionErrorStageEnum.S3_STORAGE
 
-        await complete_ingestion_run(
-            ingestion_run_id=ingestion_run_id,
-            records_fetched=result["total_records"],
-            records_updated=persistence_result["updated"],
-            records_skipped=len(result["skipped_records"])
-            + persistence_result["skipped"],
-            records_inserted=persistence_result["created"],
-            records_failed=len(result["invalid_records"])
-            + persistence_result["failed"],
-            s3_path=s3_path,
-            http_status=http_status,
-            retry_count=retry_count,
-        )
+                s3_path = await store_raw_data_to_s3(
+                    raw_data=raw_records,
+                    source_code=source["source_code"],
+                    ingestion_run_id=ingestion_run_id,
+                )
+
+            current_stage = IngestionErrorStageEnum.PARSE
+
+            counters = {
+                "total_records": 0,
+                "valid_records": 0,
+                "invalid_records": 0,
+                "skipped_records": 0,
+                "created": 0,
+                "updated": 0,
+                "persisted_skipped": 0,
+            }
+
+            for batch_number, job_batch in enumerate(
+                split_into_batches(job_records, source["batch_size"]), start=1
+            ):
+                logger.info(
+                    "Processing RemoteOK batch. batch_number=%s, batch_size=%s",
+                    batch_number,
+                    len(job_batch),
+                )
+
+                result = await process_remoteok_batch(job_batch)
+
+                current_stage = IngestionErrorStageEnum.PERSIST
+
+                persistence_result = await persist_normalized_batch(
+                    source_id=source["source_id"],
+                    ingestion_run_id=ingestion_run_id,
+                    normalized_jobs=result["normalized_jobs"],
+                )
+
+                counters["total_records"] += result["total_records"]
+                counters["valid_records"] += result["valid_records"]
+                counters["invalid_records"] += len(result["invalid_records"])
+                counters["skipped_records"] += len(result["skipped_records"])
+
+                counters["created"] += persistence_result["created"]
+                counters["updated"] += persistence_result["updated"]
+                counters["persisted_skipped"] += persistence_result["skipped"]
+
+            await update_source_feed_checkpoint(
+                source_id=source["source_id"],
+                last_updated=last_updated,
+            )
+
+            await complete_ingestion_run(
+                ingestion_run_id=ingestion_run_id,
+                records_fetched=counters["total_records"],
+                records_updated=counters["updated"],
+                records_skipped=(
+                    counters["skipped_records"] + counters["persisted_skipped"]
+                ),
+                records_inserted=counters["created"],
+                records_failed=counters["invalid_records"],
+                s3_path=s3_path,
+                http_status=http_status,
+                retry_count=retry_count,
+            )
+
+            logger.info(
+                "RemoteOK ingestion completed successfully. "
+                "source_id=%s, fetched=%s, inserted=%s, "
+                "updated=%s, skipped=%s, failed=%s",
+                source["source_id"],
+                counters["total_records"],
+                counters["created"],
+                counters["updated"],
+                counters["skipped_records"] + counters["persisted_skipped"],
+                counters["invalid_records"],
+            )
 
     except Exception as exc:
         try:

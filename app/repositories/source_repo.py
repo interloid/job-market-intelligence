@@ -37,6 +37,19 @@ class SourceRepository(BaseRepository[Source]):
 
         return source
 
+    async def update_feed_checkpoint(
+        self, source_id: UUID, last_updated: int
+    ) -> Source | None:
+        source = await self.get_by_id(source_id)
+
+        if source is None:
+            return None
+
+        source.last_feed_updated = last_updated
+        await self.db.flush()
+
+        return source
+
     async def get_eligible_source(self, source_id: UUID) -> Source | None:
         stmt = select(Source).where(
             Source.id == source_id,

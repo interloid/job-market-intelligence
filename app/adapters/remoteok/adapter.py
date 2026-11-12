@@ -140,7 +140,9 @@ class RemoteOkAdapter:
         )
 
     @staticmethod
-    async def fetch_job_records(source: Source) -> tuple[list[dict], int]:
+    async def fetch_job_records(
+        source: Source,
+    ) -> tuple[list[dict], list[dict], int, int]:
 
         try:
             url = source["base_url"]
@@ -163,18 +165,30 @@ class RemoteOkAdapter:
                     logger.exception("RemoteOK API returned invalid JSON")
                     raise
 
-                if not isinstance(data, list):
+                if not isinstance(data, list) or not data:
                     raise TypeError("Expected a list of job records from RemoteOK API")
 
-                if not data:
-                    raise ValueError("RemoteOK API returned an empty response")
+                metadata = data[0]
 
+                if not isinstance(metadata, dict):
+                    raise TypeError(
+                        "RemoteOK API response contains a non-dictionary recored"
+                    )
+
+                last_updated = metadata.get("last_updated")
+
+                if not isinstance(last_updated, int):
+                    raise TypeError(
+                        "Expected a integer of job records from RemoteOK API"
+                    )
+
+                job_records = data[1:]
                 if not all(isinstance(record, dict) for record in data):
                     raise ValueError(
                         "RemoteOK API response contains a non-dictionary record"
                     )
 
-                return data, http_status
+                return data, job_records, last_updated, http_status
 
         except httpx.HTTPStatusError as exc:
             status_code = exc.response.status_code

@@ -9,6 +9,7 @@ from sqlalchemy import (
     String,
     Text,
     text,
+    BigInteger,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -25,6 +26,7 @@ class Source(Base):
 
     __table_args__ = (
         CheckConstraint("fetch_interval_minutes > 0", name="fetch_interval_positive"),
+        CheckConstraint("batch_size > 0", name="batch_size_positive"),
     )
 
     name: Mapped[str] = mapped_column(
@@ -139,6 +141,12 @@ class Source(Base):
     next_run_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+
+    last_feed_updated: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+
+    batch_size: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=50, server_default="50"
     )
 
     ingestion_runs: Mapped[list["IngestionRun"]] = relationship(
