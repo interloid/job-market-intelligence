@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.api.api_router import router as api_router
 from app.core.config import get_settings
 from app.core.lifespan import lifespan
 
@@ -14,3 +15,5 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.DEBUG else None,
     lifespan=lifespan,
 )
+
+app.include_router(api_router)

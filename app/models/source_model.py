@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -9,7 +10,6 @@ from sqlalchemy import (
     String,
     Text,
     text,
-    BigInteger,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

@@ -1,7 +1,7 @@
 from typing import TypeVar
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.base_model import Base
@@ -22,10 +22,8 @@ class BaseRepository[ModelType: Base]:
 
     async def list_all(
         self,
-        limit: int = 10,
-        offset: int = 0,
     ) -> list[ModelType]:
-        stmt = select(self.model).limit(limit).offset(offset)
+        stmt = select(self.model)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
@@ -41,3 +39,10 @@ class BaseRepository[ModelType: Base]:
     async def delete(self, obj: ModelType) -> None:
         await self.db.delete(obj)
         await self.db.flush()
+
+    def build_query(self) -> Select:
+        return select(self.model)
+
+    async def execute_query(self, stmt: Select) -> list[ModelType]:
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())

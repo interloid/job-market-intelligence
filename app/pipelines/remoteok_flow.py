@@ -15,8 +15,8 @@ from app.pipelines.remoteok_task import (
     persist_normalized_batch,
     process_remoteok_batch,
     store_raw_data_to_s3,
-    update_source_run_schedule,
     update_source_feed_checkpoint,
+    update_source_run_schedule,
 )
 from app.utils import split_into_batches
 
