@@ -15,7 +15,8 @@ class CursorCode:
         return encoded.rstrip(b"=").decode("ascii")
 
     @staticmethod
-    def decode(cursor: str,
+    def decode(
+        cursor: str,
         schema: type[BaseModel],
     ) -> BaseModel:
 
@@ -32,5 +33,3 @@ class CursorCode:
 
         except (binascii.Error, ValueError, ValidationError) as exc:
             raise ValueError("Invalid cursor") from exc
-        
-    

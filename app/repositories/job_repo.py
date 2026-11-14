@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, func, or_, and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -15,6 +15,7 @@ from app.core.constants import (
 )
 from app.models import Job, JobTag, Tag
 from app.repositories.base_repo import BaseRepository
+from app.schemas.pagination_schema import CursorModel
 
 
 class JobRepository(BaseRepository[Job]):
@@ -256,6 +257,7 @@ class JobRepository(BaseRepository[Job]):
         tags: list[str] | None = None,
         sort_by: str = "created_at",
         sort_order: str = "desc",
+        cursor: CursorModel | None = None,
     ) -> Select:
 
         stmt = self.build_query()
@@ -283,4 +285,21 @@ class JobRepository(BaseRepository[Job]):
             sort_order=sort_order,
         )
 
+        stmt = self.apply_cursor_filter(stmt, cursor)
+
         return stmt
+
+    async def apply_cursor_filter(self, stmt, cursor):
+
+        if cursor is None:
+            return stmt
+
+        return stmt.where(
+            or_(
+                Job.updated_at < cursor.sort_value,
+                and_(
+                    Job.updated_at == cursor.sort_value,
+                    Job.id < cursor.record_id,
+                ),
+            )
+        )
