@@ -1,12 +1,16 @@
 from uuid import UUID
-from typing import TypeVar
 
 from pydantic import BaseModel
 
-T = TypeVar("T")
-ID = TypeVar("ID", UUID, int, str)
 
-
-class CursorModel(BaseModel, [T, ID]):
+class CursorModel[T, ID: (UUID, int, str)](BaseModel):
     sort_value: T
     record_id: ID
+
+
+class CursorResponse[T](BaseModel):
+    data: list[T]
+    next_cursor: str | None
+    prev_cursor: str | None
+    has_next: bool
+    has_prev: bool

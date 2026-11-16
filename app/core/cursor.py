@@ -10,7 +10,7 @@ class CursorCode:
 
         json_data = payload.model_dump_json().encode("utf")
 
-        encoded = base64.urlsafe_b64decode(json_data)
+        encoded = base64.urlsafe_b64encode(json_data)
 
         return encoded.rstrip(b"=").decode("ascii")
 

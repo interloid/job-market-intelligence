@@ -1,8 +1,9 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import ClassVar, Literal
 from uuid import UUID
 
-from sqlalchemy import Select, func, or_, and_, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -19,6 +20,14 @@ from app.schemas.pagination_schema import CursorModel
 
 
 class JobRepository(BaseRepository[Job]):
+    SORT_FIELDS: ClassVar[dict] = {
+        "created_at": Job.created_at,
+        "updated_at": Job.updated_at,
+        "posted_at": Job.posted_at,
+        "salary_min": Job.salary_min,
+        "salary_max": Job.salary_max,
+    }
+
     def __init__(self, db: AsyncSession):
         super().__init__(model=Job, db=db)
 
@@ -81,14 +90,6 @@ class JobRepository(BaseRepository[Job]):
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
-
-    SORT_FIELDS = {
-        "created_at": Job.created_at,
-        "updated_at": Job.updated_at,
-        "posted_at": Job.posted_at,
-        "salary_min": Job.salary_min,
-        "salary_max": Job.salary_max,
-    }
 
     def apply_filters(
         self,
@@ -178,6 +179,7 @@ class JobRepository(BaseRepository[Job]):
         *,
         sort_by: str = "updated_at",
         sort_order: str = "desc",
+        reverse: bool = False,
     ) -> Select:
 
         sort_column = self.SORT_FIELDS.get(sort_by)
@@ -185,7 +187,12 @@ class JobRepository(BaseRepository[Job]):
         if sort_column is None:
             raise ValueError(f"Invalid sort field: {sort_by}")
 
-        if sort_order == "asc":
+        is_ascending = sort_order == "asc"
+
+        if reverse:
+            is_ascending = not is_ascending
+
+        if is_ascending:
             stmt = stmt.order_by(sort_column.asc(), Job.id.asc())
         else:
             stmt = stmt.order_by(sort_column.desc(), Job.id.desc())
@@ -214,29 +221,6 @@ class JobRepository(BaseRepository[Job]):
             selectinload(Job.job_tags).selectinload(JobTag.tag)
         )
 
-        stmt = self.apply_search(stmt, search=search)
-
-        stmt = self.apply_filters(
-            stmt,
-            source_id=source_id,
-            status=status,
-            location=location,
-            employment_type=employment_type,
-            remote_scope=remote_scope,
-            seniority=seniority,
-            pay_period=pay_period,
-            min_salary=min_salary,
-            max_salary=max_salary,
-        )
-
-        stmt = self.apply_tag_filters(stmt, tags=tags)
-
-        stmt = self.apply_sorting(
-            stmt,
-            sort_by=sort_by,
-            sort_order=sort_order,
-        )
-
         result = await self.db.execute(stmt)
 
         return list(result.scalars().all())
@@ -258,9 +242,13 @@ class JobRepository(BaseRepository[Job]):
         sort_by: str = "created_at",
         sort_order: str = "desc",
         cursor: CursorModel | None = None,
+        direction: Literal["next", "prev"] = "next",
+        reverse: bool = False,
     ) -> Select:
 
-        stmt = self.build_query()
+        stmt = self.build_query().options(
+            selectinload(Job.job_tags).selectinload(JobTag.tag)
+        )
 
         stmt = self.apply_filters(
             stmt,
@@ -276,30 +264,117 @@ class JobRepository(BaseRepository[Job]):
         )
 
         stmt = self.apply_search(stmt, search=search)
-
         stmt = self.apply_tag_filters(stmt, tags=tags)
+
+        stmt = self.apply_cursor_filter(
+            stmt,
+            cursor,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            direction=direction,
+        )
 
         stmt = self.apply_sorting(
             stmt,
             sort_by=sort_by,
             sort_order=sort_order,
+            reverse=reverse,
         )
-
-        stmt = self.apply_cursor_filter(stmt, cursor)
 
         return stmt
 
-    async def apply_cursor_filter(self, stmt, cursor):
+    def apply_cursor_filter(
+        self,
+        stmt: Select,
+        cursor: CursorModel | None,
+        *,
+        sort_by: str,
+        sort_order: str,
+        direction: Literal["next", "prev"] = "next",
+    ) -> Select:
 
         if cursor is None:
             return stmt
 
+        sort_column = self.SORT_FIELDS[sort_by]
+
+        is_ascending = sort_order == "asc"
+
+        if direction == "prev":
+            is_ascending = not is_ascending
+
+        if is_ascending:
+            return stmt.where(
+                or_(
+                    sort_column > cursor.sort_value,
+                    and_(
+                        sort_column == cursor.sort_value,
+                        Job.id > cursor.record_id,
+                    ),
+                )
+            )
+
         return stmt.where(
             or_(
-                Job.updated_at < cursor.sort_value,
+                sort_column < cursor.sort_value,
                 and_(
-                    Job.updated_at == cursor.sort_value,
+                    sort_column == cursor.sort_value,
                     Job.id < cursor.record_id,
                 ),
             )
         )
+
+    async def paginate_jobs(
+        self,
+        *,
+        limit: int = 10,
+        cursor: CursorModel | None = None,
+        direction: Literal["next", "prev"] = "next",
+        search: str | None = None,
+        source_id: UUID | None = None,
+        status: JobStatusEnum | None = None,
+        location: str | None = None,
+        employment_type: EmploymentTypeEnum | None = None,
+        remote_scope: RemoteScopeEnum | None = None,
+        seniority: SeniorityEnum | None = None,
+        pay_period: PayPeriodEnum | None = None,
+        min_salary: Decimal | None = None,
+        max_salary: Decimal | None = None,
+        tags: list[str] | None = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> tuple[list[Job], bool]:
+
+        stmt = self.build_jobs_query(
+            search=search,
+            source_id=source_id,
+            status=status,
+            location=location,
+            employment_type=employment_type,
+            remote_scope=remote_scope,
+            seniority=seniority,
+            pay_period=pay_period,
+            min_salary=min_salary,
+            max_salary=max_salary,
+            tags=tags,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            cursor=cursor,
+            direction=direction,
+            reverse=(direction == "prev"),
+        )
+
+        stmt = stmt.limit(limit + 1)
+
+        result = await self.db.execute(stmt)
+
+        jobs = list(result.scalars().all())
+
+        has_more = len(jobs) > limit
+
+        jobs = jobs[:limit]
+
+        if direction == "prev":
+            jobs.reverse()
+
+        return jobs, has_more

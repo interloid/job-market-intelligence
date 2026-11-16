@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,9 +11,9 @@ from app.core.constants import (
     RemoteScopeEnum,
     SeniorityEnum,
 )
-from app.exceptions.custom_exception import BadRequestException
-from app.models.jobs_model import Job
+from app.core.cursor import CursorCode
 from app.repositories import JobRepository
+from app.schemas import CursorModel, CursorResponse, JobResponse
 from app.services.base_service import BaseServices
 
 
@@ -24,6 +25,9 @@ class JobServices(BaseServices):
     async def get_all_jobs(
         self,
         *,
+        limit: int = 10,
+        cursor: CursorModel | None = None,
+        direction: Literal["next", "prev"] = "next",
         search: str | None = None,
         source_id: UUID | None = None,
         status: JobStatusEnum | None = None,
@@ -35,38 +39,15 @@ class JobServices(BaseServices):
         min_salary: Decimal | None = None,
         max_salary: Decimal | None = None,
         tags: list[str] | None = None,
-        sort_by: str = "created_at",
+        sort_by: str = "updated_at",
         sort_order: str = "desc",
-    ) -> list[Job]:
+    ) -> CursorResponse[JobResponse]:
 
-        normalized_search = search.strip() if search else None
-
-        normalized_sort_order = self.validate_sort_order(sort_order)
-
-        if sort_by not in self.job_repo.SORT_FIELDS:
-            raise BadRequestException(message=f"Invalid sort field: {sort_by}")
-
-        if (
-            min_salary is not None
-            and max_salary is not None
-            and min_salary > max_salary
-        ):
-            raise BadRequestException(
-                message="Minimum salary cannot exceed maximum salary"
-            )
-
-        normalized_tags = None
-
-        if tags:
-            normalized_tags = list(
-                dict.fromkeys(tag.strip().lower() for tag in tags if tag)
-            )
-
-            if not normalized_tags:
-                normalized_tags = None
-
-        return await self.job_repo.get_all_jobs(
-            search=normalized_search,
+        jobs, has_more = await self.job_repo.paginate_jobs(
+            limit=limit,
+            cursor=cursor,
+            direction=direction,
+            search=search,
             source_id=source_id,
             status=status,
             location=location,
@@ -76,7 +57,53 @@ class JobServices(BaseServices):
             pay_period=pay_period,
             min_salary=min_salary,
             max_salary=max_salary,
-            tags=normalized_tags,
+            tags=tags,
             sort_by=sort_by,
-            sort_order=normalized_sort_order,
+            sort_order=sort_order,
+        )
+
+        if not jobs:
+            return CursorResponse(
+                data=[],
+                next_cursor=None,
+                prev_cursor=None,
+                has_next=False,
+                has_prev=False,
+            )
+
+        first_record = jobs[0]
+        last_record = jobs[-1]
+
+        if direction == "next":
+            has_next = has_more
+            has_prev = cursor is not None
+        else:
+            has_prev = has_more
+            has_next = cursor is not None
+
+        next_cursor = None
+        prev_cursor = None
+
+        if has_next:
+            next_cursor = CursorCode.encode(
+                CursorModel(
+                    sort_value=getattr(last_record, sort_by),
+                    record_id=last_record.id,
+                )
+            )
+
+        if has_prev:
+            prev_cursor = CursorCode.encode(
+                CursorModel(
+                    sort_value=getattr(first_record, sort_by),
+                    record_id=first_record.id,
+                )
+            )
+
+        return CursorResponse(
+            data=[JobResponse.model_validate(job) for job in jobs],
+            next_cursor=next_cursor,
+            prev_cursor=prev_cursor,
+            has_next=has_next,
+            has_prev=has_prev,
         )

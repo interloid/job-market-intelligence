@@ -1,10 +1,7 @@
 from collections.abc import Iterator
-from typing import TypeVar
-
-T = TypeVar("T")
 
 
-def split_into_batches(
+def split_into_batches[T](
     records: list[T],
     batch_size: int,
 ) -> Iterator[list[T]]:
