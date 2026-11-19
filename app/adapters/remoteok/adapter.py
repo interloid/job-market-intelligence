@@ -77,8 +77,6 @@ class RemoteOkAdapter:
             else None
         )
 
-        salary_present = record.salary_min is not None or record.salary_max is not None
-
         job = JobSchema(
             external_job_id=record.id,
             title=record.position,
@@ -93,8 +91,6 @@ class RemoteOkAdapter:
             salary_min=salary_min,
             salary_max=salary_max,
             remote_scope=RemoteScopeEnum.REMOTE,
-            currency="USD" if salary_present else None,
-            pay_period=PayPeriodEnum.YEAR if salary_present else None,
         )
 
         job.content_hash = generate_content_hash(job)
