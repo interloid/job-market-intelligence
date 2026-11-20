@@ -89,6 +89,8 @@ class JobServices(BaseServices):
                 CursorModel(
                     sort_value=getattr(last_record, sort_by),
                     record_id=last_record.id,
+                    sort_by=sort_by,
+                    sort_order=sort_order,
                 )
             )
 
@@ -97,6 +99,8 @@ class JobServices(BaseServices):
                 CursorModel(
                     sort_value=getattr(first_record, sort_by),
                     record_id=first_record.id,
+                    sort_by=sort_by,
+                    sort_order=sort_order,
                 )
             )
 

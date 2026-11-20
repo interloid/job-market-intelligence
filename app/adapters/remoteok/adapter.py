@@ -9,7 +9,6 @@ from app.models import Source
 from app.schemas.job_schema import (
     AdapterJobSchema,
     JobSchema,
-    PayPeriodEnum,
     RemoteScopeEnum,
 )
 from app.utils import clean_job_description, generate_content_hash
@@ -203,7 +202,7 @@ class RemoteOkAdapter:
     async def run(
         source: Source,
     ) -> tuple[list[dict], list[AdapterJobSchema], int, int, list[dict], list[dict]]:
-        raw_records, _ = await RemoteOkAdapter.fetch_job_records(source)
+        raw_records, job_records, _, _ = await RemoteOkAdapter.fetch_job_records(source)
 
         (
             normalized_records,
@@ -211,7 +210,7 @@ class RemoteOkAdapter:
             valid_records,
             invalid_records,
             skipped_records,
-        ) = RemoteOkAdapter.process_job_records(raw_records)
+        ) = RemoteOkAdapter.process_job_records(job_records)
 
         return (
             raw_records,

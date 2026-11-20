@@ -115,7 +115,13 @@ class JobRepository(BaseRepository[Job]):
             filters.append(Job.status == status)
 
         if location:
-            filters.append(Job.location.ilike(f"%{location.strip()}%"))
+            escaped_location = self.escape_ilike(location.strip())
+            filters.append(
+                Job.location.ilike(
+                    f"%{escaped_location}%",
+                    escape="\\",
+                )
+            )
 
         if employment_type is not None:
             filters.append(Job.employment_type == employment_type)
@@ -149,9 +155,18 @@ class JobRepository(BaseRepository[Job]):
         if not tags:
             return stmt
 
+        normalized_tags = [tag.strip().lower() for tag in tags if tag.strip()]
+
+        if not normalized_tags:
+            return stmt
+
         return stmt.where(
-            Job.job_tags.any(JobTag.tag.has(func.lower(Tag.name).in_(tags)))
+            Job.job_tags.any(JobTag.tag.has(func.lower(Tag.name).in_(normalized_tags)))
         )
+
+    @staticmethod
+    def escape_ilike(value: str) -> str:
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
     def apply_search(
         self,
@@ -163,15 +178,19 @@ class JobRepository(BaseRepository[Job]):
         if not search or not search.strip():
             return stmt
 
-        search_pattern = f"%{search.strip()}%"
+        escaped_search = self.escape_ilike(search.strip())
 
-        search_expression = or_(
-            Job.title.ilike(search_pattern),
-            Job.company_name.ilike(search_pattern),
-            Job.description.ilike(search_pattern),
+        search_pattern = f"%{escaped_search}%"
+
+        stmt = stmt.where(
+            or_(
+                Job.title.ilike(search_pattern, escape="\\"),
+                Job.company.ilike(search_pattern, escape="\\"),
+                Job.description.ilike(search_pattern, escape="\\"),
+            )
         )
 
-        return stmt.where(search_expression)
+        return stmt
 
     def apply_sorting(
         self,
@@ -193,9 +212,23 @@ class JobRepository(BaseRepository[Job]):
             is_ascending = not is_ascending
 
         if is_ascending:
-            stmt = stmt.order_by(sort_column.asc(), Job.id.asc())
+            order_column = sort_column.asc()
+            id_column = Job.id.asc()
         else:
-            stmt = stmt.order_by(sort_column.desc(), Job.id.desc())
+            order_column = sort_column.desc()
+            id_column = Job.id.desc()
+
+        if reverse:
+            order_column = (
+                sort_column.desc().nulls_first()
+                if is_ascending
+                else sort_column.asc().nulls_first()
+            )
+            id_column = Job.id.desc() if is_ascending else Job.id.asc()
+        else:
+            order_column = order_column.nulls_last()
+
+        stmt = stmt.order_by(order_column, id_column)
 
         return stmt
 
@@ -217,8 +250,20 @@ class JobRepository(BaseRepository[Job]):
         sort_order: str = "desc",
     ) -> list[Job]:
 
-        stmt = self.build_query().options(
-            selectinload(Job.job_tags).selectinload(JobTag.tag)
+        stmt = self.build_jobs_query(
+            search=search,
+            source_id=source_id,
+            status=status,
+            location=location,
+            employment_type=employment_type,
+            remote_scope=remote_scope,
+            seniority=seniority,
+            pay_period=pay_period,
+            min_salary=min_salary,
+            max_salary=max_salary,
+            tags=tags,
+            sort_by=sort_by,
+            sort_order=sort_order,
         )
 
         result = await self.db.execute(stmt)
@@ -299,30 +344,57 @@ class JobRepository(BaseRepository[Job]):
         sort_column = self.SORT_FIELDS[sort_by]
 
         is_ascending = sort_order == "asc"
+        is_next = direction == "next"
 
-        if direction == "prev":
-            is_ascending = not is_ascending
+        use_greater_than = is_ascending == is_next
 
-        if is_ascending:
+        if cursor.sort_value is None:
+            id_filter = (
+                Job.id > cursor.record_id
+                if use_greater_than
+                else Job.id < cursor.record_id
+            )
+
+            if is_next:
+                return stmt.where(
+                    and_(
+                        sort_column.is_(None),
+                        id_filter,
+                    )
+                )
+
             return stmt.where(
                 or_(
-                    sort_column > cursor.sort_value,
+                    sort_column.is_not(None),
                     and_(
-                        sort_column == cursor.sort_value,
-                        Job.id > cursor.record_id,
+                        sort_column.is_(None),
+                        id_filter,
                     ),
                 )
             )
 
-        return stmt.where(
-            or_(
-                sort_column < cursor.sort_value,
-                and_(
-                    sort_column == cursor.sort_value,
-                    Job.id < cursor.record_id,
-                ),
-            )
+        comparison = (
+            sort_column > cursor.sort_value
+            if use_greater_than
+            else sort_column < cursor.sort_value
         )
+
+        id_filter = (
+            Job.id > cursor.record_id if use_greater_than else Job.id < cursor.record_id
+        )
+
+        filters = [
+            comparison,
+            and_(
+                sort_column == cursor.sort_value,
+                id_filter,
+            ),
+        ]
+
+        if is_next:
+            filters.append(sort_column.is_(None))
+
+        return stmt.where(or_(*filters))
 
     async def paginate_jobs(
         self,

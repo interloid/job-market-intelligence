@@ -19,17 +19,24 @@ async def source_dispatcher_flow():
         return
 
     for source in due_sources:
-        if source["source_code"] == "remoteok":
-            logger.info("Starting RemoteOK ingestion")
+        source_code = source["source_code"]
+        try:
+            if source_code == "remoteok":
+                logger.info("Starting RemoteOK ingestion")
 
-            await remoteok_ingestion_flow(
-                source_id=source["source_id"],
-            )
+                await remoteok_ingestion_flow(
+                    source_id=source["source_id"],
+                )
 
-        else:
-            logger.warning(
-                "No ingestion flow configured for source: %s",
-                source["source_code"],
+            else:
+                logger.warning(
+                    "No ingestion flow configured for source: %s",
+                    source["source_code"],
+                )
+        except Exception:
+            logger.exception(
+                "Ingestion failed for source: %s",
+                source_code,
             )
 
 

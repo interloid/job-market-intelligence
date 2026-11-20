@@ -1,11 +1,14 @@
 import logging
 import sys
 
+from app.core.config import get_settings
 from app.utils.logging_var import (
     method_ctx,
     path_ctx,
     request_id_ctx,
 )
+
+settings = get_settings()
 
 LOG_FORMAT = (
     "%(asctime)s | "
@@ -24,18 +27,19 @@ class RequestContextFilter(logging.Filter):
         record.method = method_ctx.get("-")
         record.path = path_ctx.get("-")
         return True
-    
+
+
 def setup_logging():
     formatter = logging.Formatter(fmt=LOG_FORMAT, datefmt="%Y-%m-%d %H:%M:%S")
 
     stdout_handler = logging.StreamHandler(sys.stdout)
-    
+
     stdout_handler.setFormatter(formatter)
     stdout_handler.addFilter(RequestContextFilter())
-    
+
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(settings.LOG_LEVEL)
 
     root_logger.addHandler(stdout_handler)
 

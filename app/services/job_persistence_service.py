@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import JobAuditLogEnum, JobSkillTagEnum, JobStatusEnum
@@ -276,7 +277,7 @@ class JobPersistenceService:
 
             if old_value != new_value:
                 changed_fields[field_name] = {
-                    "old": old_value,
+                    "old": jsonable_encoder(old_value),
                     "new": audit_data[field_name],
                 }
 

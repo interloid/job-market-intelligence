@@ -1,5 +1,6 @@
 from contextvars import ContextVar
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+
 from uuid6 import uuid7
 
 

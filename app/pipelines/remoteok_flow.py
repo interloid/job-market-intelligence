@@ -105,6 +105,8 @@ async def remoteok_ingestion_flow(source_id: UUID):
             for batch_number, job_batch in enumerate(
                 split_into_batches(job_records, source["batch_size"]), start=1
             ):
+                current_stage = IngestionErrorStageEnum.PARSE
+
                 logger.info(
                     "Processing RemoteOK batch. batch_number=%s, batch_size=%s",
                     batch_number,

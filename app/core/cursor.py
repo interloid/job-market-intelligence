@@ -8,7 +8,7 @@ class CursorCode:
     @staticmethod
     def encode(payload: BaseModel) -> str:
 
-        json_data = payload.model_dump_json().encode("utf")
+        json_data = payload.model_dump_json().encode("utf-8")
 
         encoded = base64.urlsafe_b64encode(json_data)
 

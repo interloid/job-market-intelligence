@@ -3,8 +3,8 @@ from fastapi import FastAPI
 from app.api.api_router import router as api_router
 from app.core.config import get_settings
 from app.core.lifespan import lifespan
-from app.middleware.logging_middleware import LoggingMiddleware
 from app.core.logging import setup_logging
+from app.middleware.logging_middleware import LoggingMiddleware
 
 setup_logging()
 
