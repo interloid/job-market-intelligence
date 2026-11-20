@@ -1,9 +1,10 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.constants import JobSkillTagEnum
 from app.models.job_tags_model import JobTag
 from app.repositories.base_repo import BaseRepository
 
@@ -40,3 +41,47 @@ class JobTagRepository(BaseRepository[JobTag]):
 
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def create_many_if_not_exists(
+        self,
+        job_id: UUID,
+        tag_ids: list[UUID],
+    ) -> None:
+
+        if not tag_ids:
+            return
+
+        values = [
+            {
+                "job_id": job_id,
+                "tag_id": tag_id,
+                "status": JobSkillTagEnum.SOURCE,
+            }
+            for tag_id in set(tag_ids)
+        ]
+
+        stmt = (
+            insert(JobTag)
+            .values(values)
+            .on_conflict_do_nothing(index_elements=[JobTag.job_id, JobTag.tag_id])
+        )
+
+        await self.db.execute(stmt)
+
+    async def delete_source_tags_not_in(
+        self,
+        job_id: UUID,
+        keep_tag_ids: set[UUID],
+    ) -> int:
+
+        stmt = delete(JobTag).where(
+            JobTag.job_id == job_id,
+            JobTag.status == JobSkillTagEnum.SOURCE,
+        )
+
+        if keep_tag_ids:
+            stmt = stmt.where(JobTag.tag_id.not_in(keep_tag_ids))
+
+        result = await self.db.execute(stmt)
+
+        return result.rowcount or 0

@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
 
     PROJECT_NAME: str = "job-market-intelligence-api"
-    PROJECT_DESCRIPTION: str
+    PROJECT_DESCRIPTION: str = "Automated data intelligence platform for job aggregation, normalization, and analysis."
     VERSION: str = "1.0.0"
     DOCS_URL: str = "/docs"
     REDOC_URL: str = "/redoc"

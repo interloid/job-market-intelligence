@@ -27,6 +27,16 @@ class TagRepository(BaseRepository[Tag]):
 
         return list(result.scalars().all())
 
+    async def get_by_names(self, names: list[str]) -> list[Tag]:
+        if not names:
+            return []
+
+        stmt = select(Tag).where(Tag.name.in_(names))
+
+        result = await self.db.execute(stmt)
+
+        return list(result.scalars().all())
+
     async def get_or_create(self, name: str) -> Tag:
 
         name = name.strip().lower()
@@ -52,3 +62,17 @@ class TagRepository(BaseRepository[Tag]):
             raise RuntimeError("Inserted tag could not be retrieved")
 
         return tag
+
+    async def get_or_create_many(self, names: list[str]) -> list[Tag]:
+        if not names:
+            return []
+
+        values = [{"name": name} for name in names]
+
+        stmt = (
+            insert(Tag).values(values).on_conflict_do_nothing(index_elements=[Tag.name])
+        )
+
+        await self.db.execute(stmt)
+
+        return await self.get_by_names(names)

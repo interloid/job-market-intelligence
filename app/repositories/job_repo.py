@@ -185,7 +185,7 @@ class JobRepository(BaseRepository[Job]):
         stmt = stmt.where(
             or_(
                 Job.title.ilike(search_pattern, escape="\\"),
-                Job.company.ilike(search_pattern, escape="\\"),
+                Job.company_name.ilike(search_pattern, escape="\\"),
                 Job.description.ilike(search_pattern, escape="\\"),
             )
         )
@@ -212,25 +212,13 @@ class JobRepository(BaseRepository[Job]):
             is_ascending = not is_ascending
 
         if is_ascending:
-            order_column = sort_column.asc()
+            order_column = sort_column.asc().nulls_last()
             id_column = Job.id.asc()
         else:
-            order_column = sort_column.desc()
+            order_column = sort_column.desc().nulls_last()
             id_column = Job.id.desc()
 
-        if reverse:
-            order_column = (
-                sort_column.desc().nulls_first()
-                if is_ascending
-                else sort_column.asc().nulls_first()
-            )
-            id_column = Job.id.desc() if is_ascending else Job.id.asc()
-        else:
-            order_column = order_column.nulls_last()
-
-        stmt = stmt.order_by(order_column, id_column)
-
-        return stmt
+        return stmt.order_by(order_column, id_column)
 
     async def get_all_jobs(
         self,

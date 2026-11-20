@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from uuid import UUID
 
@@ -26,22 +25,24 @@ logger = logging.getLogger(__name__)
 @flow(name="remoteok_ingestion_flow")
 async def remoteok_ingestion_flow(source_id: UUID):
 
-    prefect_flow_id = str(flow_run.id)
-
-    source = await fetch_remoteok_source(source_id=source_id)
-
-    if source["batch_size"] <= 0:
-        raise ValueError("Source batch_size must be greater than zero")
-
-    ingestion_run_id = await create_ingestion_run(
-        source_id=source["source_id"],
-        prefect_flow_id=prefect_flow_id,
-    )
-
+    source = None
     current_stage = IngestionErrorStageEnum.FETCH
     s3_path = None
+    ingestion_run_id = None
+
+    prefect_flow_id = str(flow_run.id)
 
     try:
+        source = await fetch_remoteok_source(source_id=source_id)
+
+        if source["batch_size"] <= 0:
+            raise ValueError("Source batch_size must be greater than zero")
+
+        ingestion_run_id = await create_ingestion_run(
+            source_id=source["source_id"],
+            prefect_flow_id=prefect_flow_id,
+        )
+
         (
             raw_records,
             job_records,
@@ -184,11 +185,6 @@ async def remoteok_ingestion_flow(source_id: UUID):
         except Exception:
             logger.exception(
                 "Failed to update source schedule. source_id=%s, ingestion_run_id=%s",
-                source["source_id"],
+                source_id,
                 ingestion_run_id,
             )
-
-
-if __name__ == "__main__":
-    id = UUID("01a1a5e6-6279-74fa-8489-0a4d5d7ec749")
-    asyncio.run(remoteok_ingestion_flow(source_id=id))

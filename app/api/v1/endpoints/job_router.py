@@ -77,6 +77,14 @@ async def get_all_jobs(
                 detail="Invalid pagination cursor",
             ) from exc
 
+    if decoded_cursor and (
+        decoded_cursor.sort_by != sort_by or decoded_cursor.sort_order != sort_order
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Cursor sort parameters do not match requested sort criteria",
+        )
+
     return await service.get_all_jobs(
         limit=limit,
         cursor=decoded_cursor,

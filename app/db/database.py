@@ -53,5 +53,9 @@ async def get_db():
 
 
 async def dispose_engine() -> None:
+    global engine, SessionLocal
+
     if engine is not None:
         await engine.dispose()
+        engine = None
+        SessionLocal = None

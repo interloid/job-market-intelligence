@@ -62,18 +62,21 @@ class JobPersistenceService:
 
     async def create_job_tags(self, job_id: UUID, source_tags: list[str]) -> None:
 
-        for tag_name in source_tags:
-            normalized_name = tag_name.strip().lower()
+        normalized_tags = {
+            tag_name.strip().lower() for tag_name in source_tags if tag_name.strip()
+        }
 
-            if not normalized_name:
-                continue
+        if not normalized_tags:
+            return
 
-            tag = await self.tag_repo.get_or_create(normalized_name)
+        tags = await self.tag_repo.get_or_create_many(list(normalized_tags))
 
-            await self.job_tag_repo.create_if_not_exists(
-                job_id=job_id,
-                tag_id=tag.id,
-            )
+        tag_ids = [tag.id for tag in tags]
+
+        await self.job_tag_repo.create_many_if_not_exists(
+            job_id=job_id,
+            tag_ids=tag_ids,
+        )
 
     async def sync_job_tags(
         self,
@@ -81,19 +84,14 @@ class JobPersistenceService:
         source_tags: list[str],
     ) -> tuple[bool, dict | None]:
 
-        incoming_tag_ids = set()
-        incoming_tag_names = set()
+        normalized_names = {
+            tag_name.strip().lower() for tag_name in source_tags if tag_name.strip()
+        }
 
-        for tag_name in source_tags:
-            normalized_name = tag_name.strip().lower()
+        incoming_tags = await self.tag_repo.get_or_create_many(list(normalized_names))
 
-            if not normalized_name:
-                continue
-
-            tag = await self.tag_repo.get_or_create(normalized_name)
-
-            incoming_tag_ids.add(tag.id)
-            incoming_tag_names.add(tag.name)
+        incoming_tag_ids = {tag.id for tag in incoming_tags}
+        incoming_tag_names = {tag.name for tag in incoming_tags}
 
         existing_job_tags = await self.job_tag_repo.get_by_job_id(job_id)
 
@@ -103,26 +101,28 @@ class JobPersistenceService:
             if job_tag.status == JobSkillTagEnum.SOURCE
         }
 
+        existing_all_tag_ids = {job_tag.tag_id for job_tag in existing_job_tags}
+
         existing_tags = await self.tag_repo.get_by_ids(
             list(existing_source_tags.keys())
         )
 
         existing_tag_names = {tag.name for tag in existing_tags}
 
-        changed = False
+        deleted_count = await self.job_tag_repo.delete_source_tags_not_in(
+            job_id=job_id,
+            keep_tag_ids=incoming_tag_ids,
+        )
 
-        for tag_id, job_tag in existing_source_tags.items():
-            if tag_id not in incoming_tag_ids:
-                await self.job_tag_repo.delete(job_tag)
-                changed = True
+        new_tag_ids = incoming_tag_ids - existing_all_tag_ids
 
-        for tag_id in incoming_tag_ids:
-            if tag_id not in existing_source_tags:
-                await self.job_tag_repo.create_if_not_exists(
-                    job_id=job_id,
-                    tag_id=tag_id,
-                )
-                changed = True
+        if new_tag_ids:
+            await self.job_tag_repo.create_many_if_not_exists(
+                job_id=job_id,
+                tag_ids=list(new_tag_ids),
+            )
+
+        changed = bool(deleted_count or new_tag_ids)
 
         tag_audit = None
 
@@ -150,11 +150,11 @@ class JobPersistenceService:
         if not adapter_jobs:
             return results
 
-        external_job_ids = list({item.job.external_job_id for item in adapter_jobs})
+        external_job_ids = {item.job.external_job_id for item in adapter_jobs}
 
         existing_jobs = await self.job_repo.get_by_external_job_ids(
             source_id=source_id,
-            external_job_ids=external_job_ids,
+            external_job_ids=list(external_job_ids),
         )
 
         existing_jobs_map = {job.external_job_id: job for job in existing_jobs}
@@ -187,10 +187,12 @@ class JobPersistenceService:
         lookup_existing: bool = True,
     ) -> tuple[str, Job]:
 
+        incoming_job = adapter_job.job
+
         if existing_job is None and lookup_existing:
             existing_job = await self.job_repo.get_by_source_and_external_id(
                 source_id=source_id,
-                external_job_id=adapter_job.job.external_job_id,
+                external_job_id=incoming_job.external_job_id,
             )
 
         if existing_job is None:
@@ -202,95 +204,61 @@ class JobPersistenceService:
 
             return "inserted", job
 
+        if incoming_job.content_hash is None:
+            raise ValueError("Job content_hash cannot be None")
+
         tag_changed, tag_audit = await self.sync_job_tags(
             job_id=existing_job.id,
             source_tags=adapter_job.source_tags,
         )
 
-        incoming_job = adapter_job.job
+        content_changed = existing_job.content_hash != incoming_job.content_hash
 
         old_status = existing_job.status
-        was_inactive = existing_job.status != JobStatusEnum.ACTIVE
-
-        if existing_job.content_hash == incoming_job.content_hash:
-            existing_job.verified_at = datetime.now(UTC)
-
-            if was_inactive:
-                existing_job.status = JobStatusEnum.ACTIVE
-                existing_job.expired_at = None
-
-            await self.job_repo.update(existing_job)
-
-            if tag_changed or was_inactive:
-                changed_fields = {}
-
-                if tag_audit:
-                    changed_fields["tags"] = tag_audit
-
-                if was_inactive:
-                    changed_fields["status"] = {
-                        "old": old_status.value,
-                        "new": JobStatusEnum.ACTIVE.value,
-                    }
-
-                audit_log = JobAuditLog(
-                    ingestion_run_id=ingestion_run_id,
-                    job_id=existing_job.id,
-                    change_type=JobAuditLogEnum.UPDATED,
-                    changed_fields=changed_fields,
-                    changed_at=datetime.now(UTC),
-                )
-
-                await self.job_audit_repo.create(audit_log)
-
-                return "updated", existing_job
-
-            return "skipped", existing_job
-
-        update_data = incoming_job.model_dump(
-            exclude={
-                "source_id",
-                "external_job_id",
-                "content_hash",
-                "status",
-                "verified_at",
-                "expired_at",
-            }
-        )
-
-        audit_data = incoming_job.model_dump(
-            mode="json",
-            exclude={
-                "source_id",
-                "external_job_id",
-                "content_hash",
-                "status",
-                "verified_at",
-                "expired_at",
-            },
-        )
+        was_inactive = old_status != JobStatusEnum.ACTIVE
 
         changed_fields = {}
 
-        for field_name, new_value in update_data.items():
-            old_value = getattr(existing_job, field_name)
-
-            if old_value != new_value:
-                changed_fields[field_name] = {
-                    "old": jsonable_encoder(old_value),
-                    "new": audit_data[field_name],
+        if content_changed:
+            update_data = incoming_job.model_dump(
+                exclude={
+                    "source_id",
+                    "external_job_id",
+                    "content_hash",
+                    "status",
+                    "verified_at",
+                    "expired_at",
                 }
+            )
 
-                setattr(existing_job, field_name, new_value)
+            audit_data = incoming_job.model_dump(
+                mode="json",
+                exclude={
+                    "source_id",
+                    "external_job_id",
+                    "content_hash",
+                    "status",
+                    "verified_at",
+                    "expired_at",
+                },
+            )
+
+            for field, new_value in update_data.items():
+                old_value = getattr(existing_job, field)
+
+                if old_value != new_value:
+                    changed_fields[field] = {
+                        "old": jsonable_encoder(old_value),
+                        "new": audit_data[field],
+                    }
+
+                    setattr(existing_job, field, new_value)
+
+            existing_job.content_hash = incoming_job.content_hash
 
         existing_job.status = JobStatusEnum.ACTIVE
         existing_job.verified_at = datetime.now(UTC)
         existing_job.expired_at = None
-
-        if incoming_job.content_hash is None:
-            raise ValueError("Job content_hash cannot be None")
-
-        existing_job.content_hash = incoming_job.content_hash
 
         if tag_audit:
             changed_fields["tags"] = tag_audit
@@ -314,4 +282,7 @@ class JobPersistenceService:
 
             await self.job_audit_repo.create(audit_log)
 
-        return "updated", existing_job
+        if content_changed or tag_changed or was_inactive:
+            return "updated", existing_job
+
+        return "skipped", existing_job

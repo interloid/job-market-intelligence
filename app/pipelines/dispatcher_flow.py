@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from uuid import UUID
 
 from prefect import flow
 
@@ -25,7 +26,7 @@ async def source_dispatcher_flow():
                 logger.info("Starting RemoteOK ingestion")
 
                 await remoteok_ingestion_flow(
-                    source_id=source["source_id"],
+                    source_id=UUID(source["source_id"]),
                 )
 
             else:

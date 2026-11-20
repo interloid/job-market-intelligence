@@ -99,11 +99,13 @@ class Job(Base):
     salary_min: Mapped[Decimal | None] = mapped_column(
         Numeric,
         nullable=True,
+        index=True,
     )
 
     salary_max: Mapped[Decimal | None] = mapped_column(
         Numeric,
         nullable=True,
+        index=True,
     )
 
     currency: Mapped[str | None] = mapped_column(
@@ -150,6 +152,7 @@ class Job(Base):
     posted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+        index=True,
     )
 
     verified_at: Mapped[datetime | None] = mapped_column(
