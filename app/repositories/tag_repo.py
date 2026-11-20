@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid6 import uuid7
 
 from app.models.tags_model import Tag
 from app.repositories.base_repo import BaseRepository
@@ -67,7 +68,7 @@ class TagRepository(BaseRepository[Tag]):
         if not names:
             return []
 
-        values = [{"name": name} for name in names]
+        values = [{"id": uuid7(), "name": name} for name in names]
 
         stmt = (
             insert(Tag).values(values).on_conflict_do_nothing(index_elements=[Tag.name])

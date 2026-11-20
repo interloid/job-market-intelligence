@@ -212,10 +212,18 @@ class JobRepository(BaseRepository[Job]):
             is_ascending = not is_ascending
 
         if is_ascending:
-            order_column = sort_column.asc().nulls_last()
+            order_column = (
+                sort_column.asc().nulls_first()
+                if reverse
+                else sort_column.asc().nulls_last()
+            )
             id_column = Job.id.asc()
         else:
-            order_column = sort_column.desc().nulls_last()
+            order_column = (
+                sort_column.desc().nulls_first()
+                if reverse
+                else sort_column.desc().nulls_last()
+            )
             id_column = Job.id.desc()
 
         return stmt.order_by(order_column, id_column)

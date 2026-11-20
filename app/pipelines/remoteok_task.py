@@ -207,19 +207,15 @@ async def persist_normalized_batch(
 
         try:
             for adapter_job in normalized_jobs:
-                status, _ = await job_persist.persist_jobs(
+                results = await job_persist.persist_jobs(
                     source_id=source_uuid,
                     ingestion_run_id=run_uuid,
                     adapter_job=adapter_job,
                 )
-                if status == "inserted":
-                    created += 1
 
-                elif status == "updated":
-                    updated += 1
-
-                elif status == "skipped":
-                    skipped += 1
+                created = results["inserted"]
+                updated = results["updated"]
+                skipped = results["skipped"]
 
             await db.commit()
 

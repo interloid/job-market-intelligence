@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid6 import uuid7
 
 from app.core.constants import JobSkillTagEnum
 from app.models.job_tags_model import JobTag
@@ -53,6 +54,7 @@ class JobTagRepository(BaseRepository[JobTag]):
 
         values = [
             {
+                "id": uuid7(),
                 "job_id": job_id,
                 "tag_id": tag_id,
                 "status": JobSkillTagEnum.SOURCE,
