@@ -207,7 +207,7 @@ async def persist_normalized_batch(
 
         try:
             for adapter_job in normalized_jobs:
-                status, _ = await job_persist.persist_job(
+                status, _ = await job_persist.persist_jobs(
                     source_id=source_uuid,
                     ingestion_run_id=run_uuid,
                     adapter_job=adapter_job,
