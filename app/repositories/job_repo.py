@@ -228,8 +228,6 @@ class JobRepository(BaseRepository[Job]):
 
         return stmt.order_by(order_column, id_column)
 
-    
-
     def build_jobs_query(
         self,
         *,
