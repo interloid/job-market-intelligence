@@ -228,43 +228,7 @@ class JobRepository(BaseRepository[Job]):
 
         return stmt.order_by(order_column, id_column)
 
-    async def get_all_jobs(
-        self,
-        *,
-        search: str | None = None,
-        source_id: UUID | None = None,
-        status: JobStatusEnum | None = None,
-        location: str | None = None,
-        employment_type: EmploymentTypeEnum | None = None,
-        remote_scope: RemoteScopeEnum | None = None,
-        seniority: SeniorityEnum | None = None,
-        pay_period: PayPeriodEnum | None = None,
-        min_salary: Decimal | None = None,
-        max_salary: Decimal | None = None,
-        tags: list[str] | None = None,
-        sort_by: str = "created_at",
-        sort_order: str = "desc",
-    ) -> list[Job]:
-
-        stmt = self.build_jobs_query(
-            search=search,
-            source_id=source_id,
-            status=status,
-            location=location,
-            employment_type=employment_type,
-            remote_scope=remote_scope,
-            seniority=seniority,
-            pay_period=pay_period,
-            min_salary=min_salary,
-            max_salary=max_salary,
-            tags=tags,
-            sort_by=sort_by,
-            sort_order=sort_order,
-        )
-
-        result = await self.db.execute(stmt)
-
-        return list(result.scalars().all())
+    
 
     def build_jobs_query(
         self,
