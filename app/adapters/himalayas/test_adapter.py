@@ -11,11 +11,10 @@ async def main():
 
     print("Total RSS records:", len(records))
 
-    for item in records[:3]:
+    for item in records[:1]:
         job_data = HimalayasAdapter.convert_item_to_dict(item)
         print(job_data)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-    
