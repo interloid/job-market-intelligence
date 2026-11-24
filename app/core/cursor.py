@@ -1,7 +1,10 @@
 import base64
 import binascii
+from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
+
+ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
 class CursorCode:
@@ -17,7 +20,7 @@ class CursorCode:
     @staticmethod
     def decode(
         cursor: str,
-        schema: type[BaseModel],
+        schema: type[ModelT],
     ) -> BaseModel:
 
         try:

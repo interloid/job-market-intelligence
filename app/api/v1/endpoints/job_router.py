@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -22,7 +22,7 @@ router = APIRouter(
     tags=["Jobs"],
 )
 
-CURSOR_SCHEMAS = {
+CURSOR_SCHEMAS: dict[str, type[CursorModel[Any, UUID]]] = {
     "created_at": CursorModel[datetime, UUID],
     "updated_at": CursorModel[datetime, UUID],
     "posted_at": CursorModel[datetime, UUID],
@@ -60,15 +60,18 @@ async def get_all_jobs(
     max_salary: Annotated[Decimal | None, Query(ge=0)] = None,
     tags: Annotated[list[str] | None, Query()] = None,
 ):
-    decoded_cursor = None
+    decoded_cursor: CursorModel[Any, UUID] | None = None
 
     if cursor:
         try:
             cursor_schema = CURSOR_SCHEMAS[sort_by]
 
-            decoded_cursor = CursorCode.decode(
-                cursor,
-                cursor_schema,
+            decoded_cursor = cast(
+                CursorModel[Any, UUID],
+                CursorCode.decode(
+                    cursor,
+                    cursor_schema,
+                ),
             )
 
         except ValueError as exc:

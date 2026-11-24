@@ -140,7 +140,7 @@ class RemoteOkAdapter:
     ) -> tuple[list[dict], list[dict], int, int]:
 
         try:
-            url = source.base_url if hasattr(source, "base_url") else source["base_url"]
+            url = source.base_url
             headers = {"User-Agent": "AutomatedDataIntelligence/1.0"}
 
             async with httpx.AsyncClient() as client:

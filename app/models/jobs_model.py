@@ -51,7 +51,6 @@ class Job(Base):
         UniqueConstraint(
             "source_id",
             "external_job_id",
-            name="source_external_id",
         ),
     )
 

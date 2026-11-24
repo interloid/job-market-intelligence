@@ -20,7 +20,6 @@ class JobTag(Base):
         UniqueConstraint(
             "job_id",
             "tag_id",
-            name="job_tag",
         ),
     )
 

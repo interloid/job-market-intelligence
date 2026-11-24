@@ -43,6 +43,9 @@ async def remoteok_ingestion_flow(source_id: UUID):
             prefect_flow_id=prefect_flow_id,
         )
 
+        if ingestion_run_id is None:
+            raise RuntimeError("Failed to create ingestion run")
+
         (
             raw_records,
             job_records,
@@ -165,26 +168,28 @@ async def remoteok_ingestion_flow(source_id: UUID):
             )
 
     except Exception as exc:
-        try:
-            await fail_ingestion_run(
-                ingestion_run_id=ingestion_run_id,
-                error_message=str(exc),
-                error_stage=current_stage,
-            )
-        except Exception:
-            logger.exception(
-                "Failed to record ingestion failure. ingestion_run_id=%s",
-                ingestion_run_id,
-            )
-        raise
+        if ingestion_run_id is not None:
+            try:
+                await fail_ingestion_run(
+                    ingestion_run_id=ingestion_run_id,
+                    error_message=str(exc),
+                    error_stage=current_stage,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to record ingestion failure. ingestion_run_id=%s",
+                    ingestion_run_id,
+                )
+            raise
 
     finally:
-        try:
-            await update_source_run_schedule(source_id=source["source_id"])
+        if source is not None:
+            try:
+                await update_source_run_schedule(source_id=source["source_id"])
 
-        except Exception:
-            logger.exception(
-                "Failed to update source schedule. source_id=%s, ingestion_run_id=%s",
-                source_id,
-                ingestion_run_id,
-            )
+            except Exception:
+                logger.exception(
+                    "Failed to update source schedule. source_id=%s, ingestion_run_id=%s",
+                    source_id,
+                    ingestion_run_id,
+                )
