@@ -3,9 +3,10 @@ from decimal import Decimal
 from typing import ClassVar, Literal
 from uuid import UUID
 
-from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy import Select, and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.constants import (
     EmploymentTypeEnum,
@@ -13,8 +14,9 @@ from app.core.constants import (
     PayPeriodEnum,
     RemoteScopeEnum,
     SeniorityEnum,
+    SourceStatusEnum,
 )
-from app.models import Job, JobTag, Tag
+from app.models import Job, JobTag, Source, Tag
 from app.repositories.base_repo import BaseRepository
 from app.schemas.pagination_schema import CursorModel
 
@@ -76,6 +78,24 @@ class JobRepository(BaseRepository[Job]):
         job.status = status
         await self.db.flush()
         return job
+
+    async def update_verification(
+        self,
+        job: Job,
+        verified_at: datetime,
+    ) -> None:
+        stmt = (
+            update(Job)
+            .where(Job.id == job.id)
+            .values(
+                verified_at=verified_at,
+                updated_at=Job.updated_at,
+            )
+            .execution_options(synchronize_session=False)
+        )
+
+        await self.db.execute(stmt)
+        set_committed_value(job, "verified_at", verified_at)
 
     async def get_jobs_not_seen_since(
         self, source_id: UUID, cutoff: datetime
@@ -249,8 +269,14 @@ class JobRepository(BaseRepository[Job]):
         reverse: bool = False,
     ) -> Select:
 
-        stmt = self.build_query().options(
-            selectinload(Job.job_tags).selectinload(JobTag.tag)
+        stmt = (
+            self.build_query()
+            .join(Source, Job.source_id == Source.id)
+            .where(
+                Source.allow_display.is_(True),
+                Source.status == SourceStatusEnum.ACTIVE,
+            )
+            .options(selectinload(Job.job_tags).selectinload(JobTag.tag))
         )
 
         stmt = self.apply_filters(

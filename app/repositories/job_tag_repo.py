@@ -76,9 +76,13 @@ class JobTagRepository(BaseRepository[JobTag]):
         keep_tag_ids: set[UUID],
     ) -> int:
 
-        stmt = delete(JobTag).where(
-            JobTag.job_id == job_id,
-            JobTag.status == JobSkillTagEnum.SOURCE,
+        stmt = (
+            delete(JobTag)
+            .where(
+                JobTag.job_id == job_id,
+                JobTag.status == JobSkillTagEnum.SOURCE,
+            )
+            .returning(JobTag.id)
         )
 
         if keep_tag_ids:
@@ -86,4 +90,4 @@ class JobTagRepository(BaseRepository[JobTag]):
 
         result = await self.db.execute(stmt)
 
-        return result.rowcount or 0
+        return len(result.scalars().all())

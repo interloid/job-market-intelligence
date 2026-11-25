@@ -6,6 +6,7 @@ from app.core.lifespan import lifespan
 from app.core.logging import setup_logging
 from app.exceptions.handler import register_exception_handlers
 from app.middleware.logging_middleware import LoggingMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 
 setup_logging()
 
@@ -21,6 +22,11 @@ app = FastAPI(
     redoc_url=settings.REDOC_URL if enable_docs else None,
     openapi_url="/openapi.json" if enable_docs else None,
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    GZipMiddleware,
+    minimum_size=1000,
 )
 
 app.add_middleware(LoggingMiddleware)

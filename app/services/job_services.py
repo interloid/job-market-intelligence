@@ -40,7 +40,7 @@ class JobServices(BaseServices):
         max_salary: Decimal | None = None,
         tags: list[str] | None = None,
         sort_by: str = "updated_at",
-        sort_order: str = "desc",
+        sort_order: Literal["asc", "desc"] = "desc",
     ) -> CursorResponse[JobResponse]:
 
         jobs, has_more = await self.job_repo.paginate_jobs(

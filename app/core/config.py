@@ -32,11 +32,18 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = Field(default=30, ge=0)
     DB_POOL_RECYCLE: int = Field(default=1800, ge=-1)
 
+<<<<<<< HEAD
     AWS_ACCESS_KEY_ID: str
     AWS_SECRET_ACCESS_KEY: SecretStr | None = None
     AWS_REGION: str
     S3_BUCKET_NAME: str
 
+=======
+    AWS_ACCESS_KEY_ID: str | None = None
+    AWS_SECRET_ACCESS_KEY: SecretStr | None = None
+    AWS_REGION: str
+    S3_BUCKET_NAME: str
+>>>>>>> feature/himalayas-rss-ingestion
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[2] / ".env",
         env_file_encoding="utf-8",

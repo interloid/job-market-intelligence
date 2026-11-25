@@ -7,6 +7,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Numeric,
     String,
     Text,
@@ -51,8 +52,8 @@ class Job(Base):
         UniqueConstraint(
             "source_id",
             "external_job_id",
-            name="source_external_id",
         ),
+        Index("ix_jobs_updated_at_id", "updated_at", "id"),
     )
 
     source_id: Mapped[UUID] = mapped_column(

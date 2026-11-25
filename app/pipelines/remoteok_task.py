@@ -96,7 +96,7 @@ async def update_source_run_schedule(source_id: str) -> None:
 async def create_ingestion_run(
     source_id: str,
     prefect_flow_id: str,
-):
+) -> str:
 
     async with get_session_factory()() as db:
         source_uuid = UUID(source_id)
@@ -206,16 +206,15 @@ async def persist_normalized_batch(
         job_persist = JobPersistenceService(db)
 
         try:
-            for adapter_job in normalized_jobs:
-                results = await job_persist.persist_jobs(
-                    source_id=source_uuid,
-                    ingestion_run_id=run_uuid,
-                    adapter_job=adapter_job,
-                )
+            results = await job_persist.persist_jobs(
+                source_id=source_uuid,
+                ingestion_run_id=run_uuid,
+                adapter_jobs=normalized_jobs,
+            )
 
-                created = results["inserted"]
-                updated = results["updated"]
-                skipped = results["skipped"]
+            created = results["inserted"]
+            updated = results["updated"]
+            skipped = results["skipped"]
 
             await db.commit()
 
