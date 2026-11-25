@@ -40,6 +40,7 @@ async def filter_job_record(
 
 from pydantic import ValidationError
 
+
 @staticmethod
 async def validate_job_record(
     records: list[dict],
@@ -49,6 +50,13 @@ async def validate_job_record(
     invalid_records = []
 
     for record in records:
+        guid = record.get("guid")
+                    
+        print(
+            f"GUID DEBUG: value={guid!r}, "
+            f"type={type(guid).__name__}",
+            flush=True,
+        )
         try:
             model_validation = HimalayasJobSchema.model_validate(record)
             valid_records.append(model_validation)
@@ -71,7 +79,7 @@ async def validate_job_record(
 
 
 @staticmethod
-async def normalize_job_record(
+def normalize_job_record(
     record: HimalayasJobSchema,
 ) -> AdapterJobSchema:
 
@@ -93,22 +101,18 @@ async def normalize_job_record(
         job=job,
         source_tags=record.categories,
     )
-    
+
+
 @staticmethod
-def process_job_records(
+async def process_job_records(
     records: list[dict],
 ) -> tuple[list[AdapterJobSchema], int, int, list[dict], list[dict]]:
 
-    filtered_jobs, skipped_records = filter_job_record(records)
+    filtered_jobs, skipped_records = await filter_job_record(records)
 
-    valid_records, invalid_records = validate_job_record(
-        filtered_jobs
-    )
+    valid_records, invalid_records = await validate_job_record(filtered_jobs)
 
-    normalized_records = [
-        normalize_job_record(record)
-        for record in valid_records
-    ]
+    normalized_records = [normalize_job_record(record) for record in valid_records]
 
     logger.info(
         (
@@ -129,8 +133,8 @@ def process_job_records(
         invalid_records,
         skipped_records,
     )
-    
-    
+
+
 @task(name="process_himalayas_batch")
 async def process_himalayas_batch(job_records: list[dict]) -> dict:
 
@@ -140,7 +144,7 @@ async def process_himalayas_batch(job_records: list[dict]) -> dict:
         valid_records,
         invalid_records,
         skipped_records,
-    ) = process_job_records(job_records)
+    ) = await process_job_records(job_records)
 
     return {
         "normalized_jobs": normalized_jobs,
@@ -149,4 +153,3 @@ async def process_himalayas_batch(job_records: list[dict]) -> dict:
         "invalid_records": invalid_records,
         "skipped_records": skipped_records,
     }
-    

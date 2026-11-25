@@ -74,7 +74,7 @@ class Job(Base):
 
     company_name: Mapped[str] = mapped_column(
         String(255),
-        nullable=False,
+        nullable=True,
     )
 
     description: Mapped[str | None] = mapped_column(

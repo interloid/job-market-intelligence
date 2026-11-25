@@ -60,7 +60,9 @@ class HimalayasAdapter:
         if root.tag != "rss" or channel is None:
             raise ValueError("Invalid RSS feed structure")
 
-        return channel.findall("item")
+        last_build_date = channel.findtext("lastBuildDate")
+
+        return channel.findall("item"), last_build_date
 
     @staticmethod
     def convert_item_to_dict(item) -> dict:
@@ -78,10 +80,13 @@ class HimalayasAdapter:
             }:
                 value = HimalayasAdapter.clean_html_content(value)
 
-            if element.attrib:
+            if element.attrib and element.tag != "guid":
                 value = {"text": value, "attributes": element.attrib}
 
             if element.tag in job_data:
+                if element.tag == "guid":
+                    continue
+                
                 if not isinstance(job_data[element.tag], list):
                     job_data[element.tag] = [job_data[element.tag]]
 
@@ -89,6 +94,12 @@ class HimalayasAdapter:
 
             else:
                 job_data[element.tag] = value
+                
+            logger.info(
+                "GUID value=%r, type=%s",
+                job_data.get("guid"),
+                type(job_data.get("guid")).__name__,
+            )
 
         return job_data
 
