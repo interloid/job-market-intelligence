@@ -5,8 +5,10 @@ from email.utils import parsedate_to_datetime
 from urllib.parse import urlparse
 
 from prefect import task
+from prefect.runtime import task_run
 from pydantic import ValidationError
 
+from app.adapters.himalayas.adapter import HimalayasAdapter
 from app.adapters.himalayas.schema import HimalayasJobSchema
 from app.core.constants import PayPeriodEnum
 from app.schemas.job_schema import AdapterJobSchema, JobSchema
@@ -15,7 +17,7 @@ from app.utils import clean_job_description, generate_content_hash
 logger = logging.getLogger(__name__)
 
 
-async def filter_job_record(
+def filter_job_record(
     records: list[dict],
 ) -> tuple[list[dict], list[dict]]:
 
@@ -42,7 +44,7 @@ async def filter_job_record(
     return job_records, skipped_records
 
 
-async def validate_job_record(
+def validate_job_record(
     records: list[dict],
 ) -> tuple[list[HimalayasJobSchema], list[dict]]:
 
@@ -75,13 +77,24 @@ def parse_himalayas_date(value: str | int | None) -> datetime | None:
     if value is None:
         return None
 
-    if isinstance(value, int) or str(value).isdigit():
-        return datetime.fromtimestamp(int(value), tz=UTC)
+    date_value = str(value).strip()
+
+    if not date_value:
+        return None
+
+    if date_value.lstrip("-").isdigit():
+        try:
+            return datetime.fromtimestamp(int(date_value), tz=UTC)
+        except (ValueError, OverflowError, OSError):
+            return None
 
     try:
-        parsed = parsedate_to_datetime(str(value))
-    except (ValueError, TypeError):
-        parsed = datetime.fromisoformat(str(value))
+        parsed = parsedate_to_datetime(date_value)
+    except (ValueError, TypeError, OverflowError):
+        try:
+            parsed = datetime.fromisoformat(date_value)
+        except (ValueError, TypeError, OverflowError):
+            return None
 
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
@@ -96,14 +109,22 @@ def normalize_job_record(
     posted_at = parse_himalayas_date(record.published_at)
     expired_at = parse_himalayas_date(record.expiryDate)
 
-    description = record.description or record.excerpt
+    description = record.content_encoded or record.description or record.excerpt
 
-    guid = record.guid
+    guid = record.guid.strip()
 
-    path = urlparse(guid).path.rstrip("/")
-    external_job_id = path.split("/")[-1]
+    if not guid:
+        raise ValueError("Job GUID is missing")
 
-    if not record.title:
+    parsed_guid = urlparse(guid)
+    path = parsed_guid.path.rstrip("/")
+
+    external_job_id = path.split("/")[-1] if path else guid
+
+    if not external_job_id:
+        raise ValueError(f"Unable to extract external job ID from GUID: {guid}")
+
+    if not record.title or not record.title.strip():
         raise ValueError("Job title is missing")
 
     pay_period = None
@@ -127,7 +148,7 @@ def normalize_job_record(
         ),
         currency=record.currency,
         pay_period=pay_period,
-        source_url=record.applicationLink,
+        source_url=record.link,
         apply_url=record.applicationLink,
         posted_at=posted_at,
         expired_at=expired_at,
@@ -141,15 +162,29 @@ def normalize_job_record(
     )
 
 
-async def process_job_records(
+def process_job_records(
     records: list[dict],
 ) -> tuple[list[AdapterJobSchema], int, int, list[dict], list[dict]]:
 
-    filtered_jobs, skipped_records = await filter_job_record(records)
+    filtered_jobs, skipped_records = filter_job_record(records)
 
-    valid_records, invalid_records = await validate_job_record(filtered_jobs)
+    valid_records, invalid_records = validate_job_record(filtered_jobs)
 
-    normalized_records = [normalize_job_record(record) for record in valid_records]
+    normalized_records = []
+
+    for record in valid_records:
+        try:
+            normalized = normalize_job_record(record)
+            normalized_records.append(normalized)
+
+        except Exception as exc:
+            logger.exception("Failed to normalize Himalayas job record")
+            invalid_records.append(
+                {
+                    "record": record,
+                    "error": str(exc),
+                }
+            )
 
     logger.info(
         (
@@ -172,6 +207,23 @@ async def process_job_records(
     )
 
 
+@task(name="fetch_himalayas_jobs", retries=2, retry_delay_seconds=5)
+async def fetch_himalayas_jobs(base_url: str) -> tuple[str, list, str, int, int]:
+
+    xml_data, http_status = await HimalayasAdapter.fetch_rss_feed_records(
+        base_url=base_url
+    )
+
+    raw_records, last_build_date = HimalayasAdapter.parse_rss_feed_records(xml_data)
+
+    if not last_build_date:
+        raise ValueError("Himalayas RSS feed missing lastBuildDate")
+
+    retry_count = task_run.run_count - 1
+
+    return xml_data, raw_records, last_build_date, http_status, retry_count
+
+
 @task(name="process_himalayas_batch")
 async def process_himalayas_batch(job_records: list[dict]) -> dict:
 
@@ -181,7 +233,7 @@ async def process_himalayas_batch(job_records: list[dict]) -> dict:
         valid_records,
         invalid_records,
         skipped_records,
-    ) = await process_job_records(job_records)
+    ) = process_job_records(job_records)
 
     return {
         "normalized_jobs": normalized_jobs,

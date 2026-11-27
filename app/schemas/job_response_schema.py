@@ -21,7 +21,7 @@ class JobResponse(BaseModel):
     external_job_id: str
 
     title: str
-    company_name: str
+    company_name: str | None = None
     description: str | None
     location: str | None
 

@@ -2,7 +2,6 @@ import logging
 from typing import Any
 
 import httpx
-from bs4 import BeautifulSoup
 from defusedxml import ElementTree as ET
 from defusedxml.common import DefusedXmlException
 
@@ -11,13 +10,11 @@ logger = logging.getLogger(__name__)
 
 class HimalayasAdapter:
     @staticmethod
-    async def fetch_rss_feed_records():
+    async def fetch_rss_feed_records(base_url: str):
 
         try:
-            url = "https://himalayas.app/jobs/rss"
-
             async with httpx.AsyncClient() as client:
-                response = await client.get(url, timeout=30.0)
+                response = await client.get(base_url, timeout=30.0)
 
                 response.raise_for_status()
                 http_status = response.status_code
@@ -74,6 +71,13 @@ class HimalayasAdapter:
             "companyName": "company_name",
         }
 
+        list_fields = {
+            "category",
+            "locationRestrictions",
+            "timezoneRestrictions",
+            "parentCategories",
+        }
+
         for element in item:
             tag_name = element.tag.split("}")[-1]
 
@@ -81,10 +85,7 @@ class HimalayasAdapter:
                 element.text.strip() if element.text and element.text.strip() else None
             )
 
-            if tag_name in {"description", "encoded"}:
-                value = HimalayasAdapter.clean_html_content(value)
-
-            if element.attrib and tag_name != "guid":
+            if element.attrib and tag_name != "guid" and tag_name not in list_fields:
                 value = {"text": value, "attributes": element.attrib}
 
             field_name = field_mapping.get(tag_name, tag_name)
@@ -93,21 +94,18 @@ class HimalayasAdapter:
                 if field_name == "guid":
                     continue
 
+                if field_name in list_fields and value is None:
+                    continue
+
                 if not isinstance(job_data[field_name], list):
                     job_data[field_name] = [job_data[field_name]]
 
                 job_data[field_name].append(value)
 
             else:
-                job_data[field_name] = value
+                if field_name in list_fields:
+                    job_data[field_name] = [value] if value is not None else None
+                else:
+                    job_data[field_name] = value
 
         return job_data
-
-    @staticmethod
-    def clean_html_content(html_content: str | None) -> str | None:
-        if not html_content:
-            return None
-
-        soup = BeautifulSoup(html_content, "html.parser")
-
-        return soup.get_text(separator=" ", strip=True)

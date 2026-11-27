@@ -156,10 +156,26 @@ class JobRepository(BaseRepository[Job]):
             filters.append(Job.pay_period == pay_period)
 
         if min_salary is not None:
-            filters.append(Job.salary_max >= min_salary)
+            filters.append(
+                or_(
+                    Job.salary_max >= min_salary,
+                    and_(
+                        Job.salary_max.is_(None),
+                        Job.salary_min.is_not(None),
+                    ),
+                )
+            )
 
         if max_salary is not None:
-            filters.append(Job.salary_min <= max_salary)
+            filters.append(
+                or_(
+                    Job.salary_min <= max_salary,
+                    and_(
+                        Job.salary_min.is_(None),
+                        Job.salary_max.is_not(None),
+                    ),
+                )
+            )
 
         if filters:
             stmt = stmt.where(*filters)

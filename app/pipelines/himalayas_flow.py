@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import UTC
 from email.utils import parsedate_to_datetime
 from uuid import UUID
 
@@ -18,7 +19,7 @@ from app.pipelines.common_task import (
     update_source_feed_checkpoint,
     update_source_run_schedule,
 )
-from app.pipelines.himalayas_task import process_himalayas_batch
+from app.pipelines.himalayas_task import fetch_himalayas_jobs, process_himalayas_batch
 from app.utils.batch import split_into_batches
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,6 @@ async def himalayas_ingestion_flow(source_id: UUID):
     current_stage = IngestionErrorStageEnum.FETCH
     s3_path = None
     prefect_flow_id = str(flow_run.id)
-    retry_count = 0
 
     try:
         source = await fetch_source_data(source_id=source_id)
@@ -45,16 +45,20 @@ async def himalayas_ingestion_flow(source_id: UUID):
             prefect_flow_id=prefect_flow_id,
         )
 
-        xml_data, http_status = await HimalayasAdapter.fetch_rss_feed_records()
+        (
+            _xml_data,
+            raw_records,
+            last_build_date,
+            http_status,
+            retry_count,
+        ) = await fetch_himalayas_jobs(base_url=source["base_url"])
 
-        raw_records, last_build_date = HimalayasAdapter.parse_rss_feed_records(xml_data)
+        parsed_build_date = parsedate_to_datetime(last_build_date)
 
-        if not last_build_date:
-            raise ValueError("Himalayas RSS feed missing lastBuildDate")
+        if parsed_build_date.tzinfo is None:
+            parsed_build_date = parsed_build_date.replace(tzinfo=UTC)
 
-        last_build_date = parsedate_to_datetime(last_build_date)
-
-        last_build_date = int(last_build_date.timestamp())
+        last_build_timestamp = int(parsed_build_date.timestamp())
 
         job_records = [
             HimalayasAdapter.convert_item_to_dict(item) for item in raw_records
@@ -62,14 +66,16 @@ async def himalayas_ingestion_flow(source_id: UUID):
 
         previous_updated = source["last_feed_updated"]
 
-        if previous_updated is not None and last_build_date < previous_updated:
+        if previous_updated is not None and last_build_timestamp < previous_updated:
             raise ValueError(
-                f"RemoteOK feed timestamp regressed. "
+                f"Himalayas feed timestamp regressed. "
                 f"Previous: {previous_updated}, "
-                f"Current: {last_build_date}"
+                f"Current: {last_build_timestamp}"
             )
 
-        has_updated = previous_updated is None or last_build_date > previous_updated
+        has_updated = (
+            previous_updated is None or last_build_timestamp > previous_updated
+        )
 
         if not has_updated:
             logger.info(
@@ -119,7 +125,7 @@ async def himalayas_ingestion_flow(source_id: UUID):
                 current_stage = IngestionErrorStageEnum.PARSE
 
                 logger.info(
-                    "Processing RemoteOK batch. batch_number=%s, batch_size=%s",
+                    "Processing Himalayas batch. batch_number=%s, batch_size=%s",
                     batch_number,
                     len(job_batch),
                 )
@@ -145,7 +151,7 @@ async def himalayas_ingestion_flow(source_id: UUID):
 
             await update_source_feed_checkpoint(
                 source_id=source["source_id"],
-                last_updated=last_build_date,
+                last_updated=last_build_timestamp,
             )
 
             await complete_ingestion_run(
@@ -163,7 +169,7 @@ async def himalayas_ingestion_flow(source_id: UUID):
             )
 
             logger.info(
-                "RemoteOK ingestion completed successfully. "
+                "Himalayas ingestion completed successfully. "
                 "source_id=%s, fetched=%s, inserted=%s, "
                 "updated=%s, skipped=%s, failed=%s",
                 source["source_id"],
@@ -187,7 +193,7 @@ async def himalayas_ingestion_flow(source_id: UUID):
                     "Failed to record ingestion failure. ingestion_run_id=%s",
                     ingestion_run_id,
                 )
-            raise
+        raise
 
     finally:
         if source is not None:

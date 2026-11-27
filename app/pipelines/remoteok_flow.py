@@ -183,7 +183,7 @@ async def remoteok_ingestion_flow(source_id: UUID):
                     "Failed to record ingestion failure. ingestion_run_id=%s",
                     ingestion_run_id,
                 )
-            raise
+        raise
 
     finally:
         if source is not None:

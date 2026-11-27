@@ -8,8 +8,6 @@ from app.utils.logging_var import (
     request_id_ctx,
 )
 
-settings = get_settings()
-
 LOG_FORMAT = (
     "%(asctime)s | "
     "%(levelname)s | "
@@ -30,6 +28,9 @@ class RequestContextFilter(logging.Filter):
 
 
 def setup_logging():
+
+    settings = get_settings()
+
     formatter = logging.Formatter(fmt=LOG_FORMAT, datefmt="%Y-%m-%d %H:%M:%S")
 
     stdout_handler = logging.StreamHandler(sys.stdout)

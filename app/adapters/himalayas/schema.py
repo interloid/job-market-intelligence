@@ -27,12 +27,22 @@ class HimalayasJobSchema(BaseModel):
 
     description: str | None = None
 
+    content_encoded: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "encoded",
+            "content:encoded",
+            "content_encoded",
+        ),
+    )
+
     published_at: str | int | None = Field(
         default=None,
         validation_alias=AliasChoices("pubDate", "published_at"),
     )
     expiryDate: str | int | None = None
 
+    link: str | None = None
     applicationLink: str | None = None
     guid: str
 

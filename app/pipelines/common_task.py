@@ -18,7 +18,6 @@ from app.schemas.job_schema import AdapterJobSchema
 from app.services import JobPersistenceService, S3StorageService
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 @task(name="fetch_source_data", retries=2, retry_delay_seconds=5)
@@ -122,6 +121,8 @@ async def store_raw_data_to_s3(
     source_code: str,
     ingestion_run_id: str,
 ) -> str:
+
+    settings = get_settings()
 
     now = datetime.now(UTC)
 

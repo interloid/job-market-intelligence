@@ -4,8 +4,9 @@ from uuid import UUID
 
 from prefect import flow
 
-from app.pipelines import himalayas_ingestion_flow, remoteok_ingestion_flow
 from app.pipelines.common_task import fetch_due_sources
+from app.pipelines.himalayas_flow import himalayas_ingestion_flow
+from app.pipelines.remoteok_flow import remoteok_ingestion_flow
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ async def source_dispatcher_flow():
                     source_id=UUID(source["source_id"]),
                 )
             elif source_code == "himalayas":
-                logger.info("Starting RemoteOK ingestion")
+                logger.info("Starting himalayas ingestion")
 
                 await himalayas_ingestion_flow(source_id=UUID(source["source_id"]))
 

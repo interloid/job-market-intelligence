@@ -5,8 +5,8 @@ from app.api.api_router import router as api_router
 from app.core.config import get_settings
 from app.core.lifespan import lifespan
 from app.core.logging import setup_logging
-from app.exceptions.handler import register_exception_handlers
-from app.middleware.logging_middleware import LoggingMiddleware
+from app.exceptions import register_exception_handlers
+from app.middleware import LoggingMiddleware
 
 setup_logging()
 

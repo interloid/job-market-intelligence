@@ -5,10 +5,8 @@ from prefect import task
 from prefect.runtime import task_run
 
 from app.adapters.remoteok.adapter import RemoteOkAdapter
-from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 @task(

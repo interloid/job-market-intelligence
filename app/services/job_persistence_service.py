@@ -207,7 +207,7 @@ class JobPersistenceService:
         if incoming_job.content_hash is None:
             raise ValueError("Job content_hash cannot be None")
 
-        tag_changed, _tag_audit = await self.sync_job_tags(
+        tag_changed, tag_audit = await self.sync_job_tags(
             job_id=existing_job.id,
             source_tags=adapter_job.source_tags,
         )
@@ -218,6 +218,9 @@ class JobPersistenceService:
         was_inactive = old_status != JobStatusEnum.ACTIVE
 
         changed_fields = {}
+
+        if tag_changed:
+            changed_fields["source_tags"] = tag_audit
 
         if content_changed:
             update_data = incoming_job.model_dump(
@@ -261,7 +264,7 @@ class JobPersistenceService:
 
             existing_job.status = JobStatusEnum.ACTIVE
             existing_job.verified_at = verified_at
-            existing_job.expired_at = None
+            # existing_job.expired_at = None
 
             await self.job_repo.update(existing_job)
 
