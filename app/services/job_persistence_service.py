@@ -230,6 +230,7 @@ class JobPersistenceService:
                     "content_hash",
                     "status",
                     "verified_at",
+                    "expired_at",
                 }
             )
 
@@ -241,6 +242,7 @@ class JobPersistenceService:
                     "content_hash",
                     "status",
                     "verified_at",
+                    "expired_at",
                 },
             )
 
@@ -257,7 +259,17 @@ class JobPersistenceService:
 
         verified_at = datetime.now(UTC)
 
-        if content_changed or tag_changed or was_inactive:
+        expiry_changed = existing_job.expired_at != incoming_job.expired_at
+
+        if expiry_changed:
+            changed_fields["expired_at"] = {
+                "old": jsonable_encoder(existing_job.expired_at),
+                "new": jsonable_encoder(incoming_job.expired_at),
+            }
+
+            existing_job.expired_at = incoming_job.expired_at
+
+        if content_changed or tag_changed or expiry_changed or was_inactive:
             existing_job.content_hash = incoming_job.content_hash
 
             existing_job.status = JobStatusEnum.ACTIVE
@@ -282,7 +294,7 @@ class JobPersistenceService:
 
             await self.job_audit_repo.create(audit_log)
 
-        if content_changed or tag_changed or was_inactive:
+        if content_changed or tag_changed or expiry_changed or was_inactive:
             return "updated", existing_job
 
         return "skipped", existing_job

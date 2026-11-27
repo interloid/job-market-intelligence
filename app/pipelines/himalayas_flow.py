@@ -46,7 +46,6 @@ async def himalayas_ingestion_flow(source_id: UUID):
         )
 
         (
-            _,
             raw_records,
             last_build_date,
             http_status,

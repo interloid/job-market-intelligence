@@ -208,7 +208,7 @@ def process_job_records(
 
 
 @task(name="fetch_himalayas_jobs", retries=2, retry_delay_seconds=5)
-async def fetch_himalayas_jobs(base_url: str) -> tuple[str, list, str, int, int]:
+async def fetch_himalayas_jobs(base_url: str) -> tuple[list, str, int, int]:
 
     xml_data, http_status = await HimalayasAdapter.fetch_rss_feed_records(
         base_url=base_url
@@ -221,7 +221,7 @@ async def fetch_himalayas_jobs(base_url: str) -> tuple[str, list, str, int, int]
 
     retry_count = task_run.run_count - 1
 
-    return xml_data, raw_records, last_build_date, http_status, retry_count
+    return raw_records, last_build_date, http_status, retry_count
 
 
 @task(name="process_himalayas_batch")
