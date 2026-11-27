@@ -27,6 +27,7 @@ dependencies = [
 dev = [
     "ruff>=0.14.0",
     "mypy>=2.4.1",
+    "types-defusedxml>=0.7.0.20260504",
 ]
 
 [tool.uv.build-backend]

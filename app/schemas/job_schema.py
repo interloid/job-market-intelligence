@@ -17,7 +17,7 @@ class JobSchema(BaseModel):
     source_id: UUID | None = None
     external_job_id: str
     title: str
-    company_name: str  | None = None
+    company_name: str | None = None
     description: str | None = None
     location: str | None = None
     remote_scope: RemoteScopeEnum | None = None

@@ -1,6 +1,7 @@
-import httpx
 import logging
+from typing import Any
 
+import httpx
 from bs4 import BeautifulSoup
 from defusedxml import ElementTree as ET
 from defusedxml.common import DefusedXmlException
@@ -67,39 +68,38 @@ class HimalayasAdapter:
     @staticmethod
     def convert_item_to_dict(item) -> dict:
 
-        job_data = {}
+        job_data: dict[str, Any] = {}
+
+        field_mapping = {
+            "companyName": "company_name",
+        }
 
         for element in item:
+            tag_name = element.tag.split("}")[-1]
+
             value = (
                 element.text.strip() if element.text and element.text.strip() else None
             )
 
-            if element.tag in {
-                "description",
-                "{http://purl.org/rss/1.0/modules/content/}encoded",
-            }:
+            if tag_name in {"description", "encoded"}:
                 value = HimalayasAdapter.clean_html_content(value)
 
-            if element.attrib and element.tag != "guid":
+            if element.attrib and tag_name != "guid":
                 value = {"text": value, "attributes": element.attrib}
 
-            if element.tag in job_data:
-                if element.tag == "guid":
-                    continue
-                
-                if not isinstance(job_data[element.tag], list):
-                    job_data[element.tag] = [job_data[element.tag]]
+            field_name = field_mapping.get(tag_name, tag_name)
 
-                job_data[element.tag].append(value)
+            if field_name in job_data:
+                if field_name == "guid":
+                    continue
+
+                if not isinstance(job_data[field_name], list):
+                    job_data[field_name] = [job_data[field_name]]
+
+                job_data[field_name].append(value)
 
             else:
-                job_data[element.tag] = value
-                
-            logger.info(
-                "GUID value=%r, type=%s",
-                job_data.get("guid"),
-                type(job_data.get("guid")).__name__,
-            )
+                job_data[field_name] = value
 
         return job_data
 

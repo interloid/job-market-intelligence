@@ -5,7 +5,6 @@ import httpx
 from pydantic import ValidationError
 
 from app.adapters.remoteok.schema import RemoteOKJobSchema
-from app.models import Source
 from app.schemas.job_schema import (
     AdapterJobSchema,
     JobSchema,
@@ -136,11 +135,11 @@ class RemoteOkAdapter:
 
     @staticmethod
     async def fetch_job_records(
-        source: Source,
+        source: dict,
     ) -> tuple[list[dict], list[dict], int, int]:
 
         try:
-            url = source.base_url
+            url = source["base_url"]
             headers = {"User-Agent": "AutomatedDataIntelligence/1.0"}
 
             async with httpx.AsyncClient() as client:
@@ -200,7 +199,7 @@ class RemoteOkAdapter:
 
     @staticmethod
     async def run(
-        source: Source,
+        source: dict,
     ) -> tuple[list[dict], list[AdapterJobSchema], int, int, list[dict], list[dict]]:
         raw_records, job_records, _, _ = await RemoteOkAdapter.fetch_job_records(source)
 

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from uuid import UUID
 
@@ -5,17 +6,19 @@ from prefect import flow
 from prefect.runtime import flow_run
 
 from app.core.constants import IngestionErrorStageEnum
-from app.pipelines.remoteok_task import (
+from app.pipelines.common_task import (
     complete_ingestion_run,
     create_ingestion_run,
     fail_ingestion_run,
-    fetch_remoteok_jobs,
-    fetch_remoteok_source,
+    fetch_source_data,
     persist_normalized_batch,
-    process_remoteok_batch,
     store_raw_data_to_s3,
     update_source_feed_checkpoint,
     update_source_run_schedule,
+)
+from app.pipelines.remoteok_task import (
+    fetch_remoteok_jobs,
+    process_remoteok_batch,
 )
 from app.utils import split_into_batches
 
@@ -33,7 +36,7 @@ async def remoteok_ingestion_flow(source_id: UUID):
     prefect_flow_id = str(flow_run.id)
 
     try:
-        source = await fetch_remoteok_source(source_id=source_id)
+        source = await fetch_source_data(source_id=source_id)
 
         if source["batch_size"] <= 0:
             raise ValueError("Source batch_size must be greater than zero")
@@ -193,3 +196,8 @@ async def remoteok_ingestion_flow(source_id: UUID):
                     source_id,
                     ingestion_run_id,
                 )
+
+
+if __name__ == "__main__":
+    id = UUID("01a1a5e6-6279-74fa-8489-0a4d5d7ec749")
+    asyncio.run(remoteok_ingestion_flow(source_id=id))

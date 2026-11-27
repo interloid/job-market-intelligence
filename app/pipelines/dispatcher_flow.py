@@ -4,8 +4,8 @@ from uuid import UUID
 
 from prefect import flow
 
+from app.pipelines.common_task import fetch_due_sources
 from app.pipelines.remoteok_flow import remoteok_ingestion_flow
-from app.pipelines.remoteok_task import fetch_due_sources
 
 logger = logging.getLogger(__name__)
 

@@ -1,25 +1,25 @@
 import asyncio
 import logging
+from email.utils import parsedate_to_datetime
 from uuid import UUID
 
 from prefect import flow
 from prefect.runtime import flow_run
-from email.utils import parsedate_to_datetime
 
-from app.pipelines.remoteok_task import (
-    create_ingestion_run,
-    persist_normalized_batch,
+from app.adapters.himalayas.adapter import HimalayasAdapter
+from app.core.constants import IngestionErrorStageEnum
+from app.pipelines.common_task import (
     complete_ingestion_run,
+    create_ingestion_run,
     fail_ingestion_run,
+    fetch_source_data,
+    persist_normalized_batch,
+    store_raw_data_to_s3,
     update_source_feed_checkpoint,
     update_source_run_schedule,
-    fetch_remoteok_source,
-    store_raw_data_to_s3,
 )
 from app.pipelines.himalayas_task import process_himalayas_batch
-from app.core.constants import IngestionErrorStageEnum
 from app.utils.batch import split_into_batches
-from app.adapters.himalayas.adapter import HimalayasAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +35,8 @@ async def himalayas_ingestion_flow(source_id: UUID):
     retry_count = 0
 
     try:
-        source = await fetch_remoteok_source(source_id=source_id)
-        
+        source = await fetch_source_data(source_id=source_id)
+
         if source["batch_size"] <= 0:
             raise ValueError("Source batch_size must be greater than zero")
 
@@ -53,7 +53,7 @@ async def himalayas_ingestion_flow(source_id: UUID):
             raise ValueError("Himalayas RSS feed missing lastBuildDate")
 
         last_build_date = parsedate_to_datetime(last_build_date)
-        
+
         last_build_date = int(last_build_date.timestamp())
 
         job_records = [
@@ -96,7 +96,7 @@ async def himalayas_ingestion_flow(source_id: UUID):
                 current_stage = IngestionErrorStageEnum.S3_STORAGE
 
                 s3_path = await store_raw_data_to_s3(
-                    raw_data=xml_data,
+                    raw_data=job_records,
                     source_code=source["source_code"],
                     ingestion_run_id=ingestion_run_id,
                 )
@@ -175,31 +175,33 @@ async def himalayas_ingestion_flow(source_id: UUID):
             )
 
     except Exception as exc:
-        try:
-            await fail_ingestion_run(
-                ingestion_run_id=ingestion_run_id,
-                error_message=str(exc),
-                error_stage=current_stage,
-            )
-        except Exception:
-            logger.exception(
-                "Failed to record ingestion failure. ingestion_run_id=%s",
-                ingestion_run_id,
-            )
-        raise
+        if ingestion_run_id is not None:
+            try:
+                await fail_ingestion_run(
+                    ingestion_run_id=ingestion_run_id,
+                    error_message=str(exc),
+                    error_stage=current_stage,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to record ingestion failure. ingestion_run_id=%s",
+                    ingestion_run_id,
+                )
+            raise
 
     finally:
-        try:
-            await update_source_run_schedule(source_id=source["source_id"])
+        if source is not None:
+            try:
+                await update_source_run_schedule(source_id=source["source_id"])
 
-        except Exception:
-            logger.exception(
-                "Failed to update source schedule. source_id=%s, ingestion_run_id=%s",
-                source_id,
-                ingestion_run_id,
-            )
+            except Exception:
+                logger.exception(
+                    "Failed to update source schedule. source_id=%s, ingestion_run_id=%s",
+                    source_id,
+                    ingestion_run_id,
+                )
+
 
 if __name__ == "__main__":
     id = UUID("01a212b1-841a-755c-835f-b54d53ccaaae")
     asyncio.run(himalayas_ingestion_flow(source_id=id))
-
