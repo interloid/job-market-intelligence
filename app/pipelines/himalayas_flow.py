@@ -46,7 +46,7 @@ async def himalayas_ingestion_flow(source_id: UUID):
         )
 
         (
-            _xml_data,
+            _,
             raw_records,
             last_build_date,
             http_status,
@@ -59,10 +59,6 @@ async def himalayas_ingestion_flow(source_id: UUID):
             parsed_build_date = parsed_build_date.replace(tzinfo=UTC)
 
         last_build_timestamp = int(parsed_build_date.timestamp())
-
-        job_records = [
-            HimalayasAdapter.convert_item_to_dict(item) for item in raw_records
-        ]
 
         previous_updated = source["last_feed_updated"]
 
@@ -98,6 +94,10 @@ async def himalayas_ingestion_flow(source_id: UUID):
             )
 
         else:
+            job_records = [
+                HimalayasAdapter.convert_item_to_dict(item) for item in raw_records
+            ]
+
             if source["allow_store"]:
                 current_stage = IngestionErrorStageEnum.S3_STORAGE
 

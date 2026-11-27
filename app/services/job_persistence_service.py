@@ -230,7 +230,6 @@ class JobPersistenceService:
                     "content_hash",
                     "status",
                     "verified_at",
-                    "expired_at",
                 }
             )
 
@@ -242,7 +241,6 @@ class JobPersistenceService:
                     "content_hash",
                     "status",
                     "verified_at",
-                    "expired_at",
                 },
             )
 
@@ -264,7 +262,6 @@ class JobPersistenceService:
 
             existing_job.status = JobStatusEnum.ACTIVE
             existing_job.verified_at = verified_at
-            # existing_job.expired_at = None
 
             await self.job_repo.update(existing_job)
 

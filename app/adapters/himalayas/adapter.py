@@ -69,6 +69,7 @@ class HimalayasAdapter:
 
         field_mapping = {
             "companyName": "company_name",
+            "category": "categories",
         }
 
         list_fields = {

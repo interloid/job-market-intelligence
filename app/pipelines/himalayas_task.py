@@ -181,7 +181,7 @@ def process_job_records(
             logger.exception("Failed to normalize Himalayas job record")
             invalid_records.append(
                 {
-                    "record": record,
+                    "record": record.model_dump(mode="json"),
                     "error": str(exc),
                 }
             )

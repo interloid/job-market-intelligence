@@ -161,7 +161,7 @@ class JobRepository(BaseRepository[Job]):
                     Job.salary_max >= min_salary,
                     and_(
                         Job.salary_max.is_(None),
-                        Job.salary_min.is_not(None),
+                        Job.salary_min >= min_salary,
                     ),
                 )
             )
@@ -172,7 +172,7 @@ class JobRepository(BaseRepository[Job]):
                     Job.salary_min <= max_salary,
                     and_(
                         Job.salary_min.is_(None),
-                        Job.salary_max.is_not(None),
+                        Job.salary_max <= max_salary,
                     ),
                 )
             )
